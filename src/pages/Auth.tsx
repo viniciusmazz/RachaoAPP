@@ -107,8 +107,15 @@ const Auth = () => {
         <CardHeader className="text-center pt-10 pb-6">
           <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl border border-slate-100 overflow-hidden">
             <img src="/logo.png" alt="RachãoApp Logo" className="w-full h-full object-contain" onError={(e) => {
-              e.currentTarget.style.display = 'none';
-              e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full bg-primary flex items-center justify-center"><span class="text-white font-black text-3xl">R</span></div>';
+              const target = e.currentTarget;
+              console.error("Auth logo failed to load at path:", target.src);
+              // Try relative path as fallback
+              if (target.src.startsWith(window.location.origin + "/logo.png")) {
+                target.src = "logo.png";
+              } else {
+                target.style.display = 'none';
+                target.parentElement!.innerHTML = '<div class="w-full h-full bg-primary flex items-center justify-center"><span class="text-white font-black text-3xl">R</span></div>';
+              }
             }} />
           </div>
           <CardTitle className="text-3xl font-black tracking-tight text-slate-900">RachãoApp</CardTitle>

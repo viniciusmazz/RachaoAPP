@@ -1,11 +1,19 @@
 import { useParams } from "react-router-dom";
+import { useEffect } from "react";
 import { useGroup } from "@/hooks/useGroup";
 import Index from "./Index";
 import NotFound from "./NotFound";
 
 const GroupPage = () => {
   const { slug } = useParams<{ slug: string }>();
+  console.log('GroupPage rendering for slug:', slug);
   const { group, loading, notFound } = useGroup(slug);
+
+  useEffect(() => {
+    if (!loading) {
+      console.log('GroupPage load complete. Group found:', !!group, 'NotFound:', notFound);
+    }
+  }, [loading, group, notFound]);
 
   if (loading) {
     return (

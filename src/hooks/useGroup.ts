@@ -57,6 +57,9 @@ export const useGroup = (slug?: string) => {
 
         if (error) {
           console.error('Supabase error fetching group:', error);
+          if (error.code === 'PGRST301' || error.message.includes('JWT')) {
+            console.error('Permission denied. Please check Supabase RLS policies.');
+          }
           throw error;
         }
 
