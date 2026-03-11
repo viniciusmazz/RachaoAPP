@@ -31,7 +31,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            rm -rf /var/www/rachao/*
+            sudo rm -rf /var/www/rachao/*
 
       - name: Deploy files
         uses: appleboy/scp-action@v0.1.7
