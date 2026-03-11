@@ -413,9 +413,11 @@ export const useUserRole = (groupId?: string) => {
 
   const isSuperAdmin = user?.email?.toLowerCase() === 'viniciusmazz@gmail.com'
   
-  if (isSuperAdmin) {
-    console.log('User is Super Admin:', user?.email)
-  }
+  useEffect(() => {
+    if (user) {
+      console.log('Auth Check - Email:', user.email, 'Target:', 'viniciusmazz@gmail.com', 'Match:', user.email?.toLowerCase() === 'viniciusmazz@gmail.com');
+    }
+  }, [user]);
   const isAdmin = role === 'admin' || isSuperAdmin
   const isFinanceiro = role === 'financeiro' || role === 'admin' || isSuperAdmin
   const isApproved = role === 'approved' || role === 'atleta' || role === 'financeiro' || role === 'admin' || isSuperAdmin

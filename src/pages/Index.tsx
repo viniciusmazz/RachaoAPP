@@ -327,7 +327,7 @@ const Index = ({ group }: IndexProps) => {
                   Financeiro
                 </TabsTrigger>
               )}
-            {isOwner && (
+            {isAdmin && (
               <TabsTrigger value="configuracoes" className="rounded-xl px-6 py-2.5 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm gap-2">
                 <Settings className="h-4 w-4" />
                 Config
@@ -428,7 +428,7 @@ const Index = ({ group }: IndexProps) => {
                 </TabsContent>
               )}
 
-              {isOwner && (
+              {isAdmin && (
                 <TabsContent value="configuracoes" className="mt-0 focus-visible:ring-0">
                   <GroupSettingsComponent
                     group={group}

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -47,6 +48,10 @@ const PLANS = [
 
 const Landing = () => {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    console.log("Landing Page Loaded - Logo Path: /logo.png");
+  }, []);
 
   return (
     <div className="min-h-screen bg-white selection:bg-primary/20">
