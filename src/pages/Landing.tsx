@@ -60,9 +60,15 @@ const Landing = () => {
         <div className="container flex items-center justify-between h-20 max-w-6xl">
           <div className="flex items-center gap-3 group cursor-pointer" onClick={() => navigate("/")}>
             <div className="w-12 h-12 bg-white rounded-xl shadow-md border border-slate-100 flex items-center justify-center overflow-hidden">
-              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" onError={(e) => {
-                e.currentTarget.style.display = 'none';
-                e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full bg-primary flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>';
+              <img src="logo.png" alt="Logo" className="w-full h-full object-contain" onError={(e) => {
+                console.error("Logo failed to load at path: logo.png - trying absolute path /logo.png");
+                const target = e.currentTarget;
+                if (target.src.includes("logo.png") && !target.src.startsWith(window.location.origin + "/logo.png")) {
+                  target.src = "/logo.png";
+                } else {
+                  target.style.display = 'none';
+                  target.parentElement!.innerHTML = '<div class="w-full h-full bg-primary flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>';
+                }
               }} />
             </div>
             <span className="font-black text-xl tracking-tighter text-slate-900">Rachão<span className="text-primary">App</span></span>
@@ -180,9 +186,14 @@ const Landing = () => {
         <div className="container max-w-6xl flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-white rounded-lg shadow-sm border border-slate-100 flex items-center justify-center overflow-hidden">
-              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" onError={(e) => {
-                e.currentTarget.style.display = 'none';
-                e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full bg-primary flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>';
+              <img src="logo.png" alt="Logo" className="w-full h-full object-contain" onError={(e) => {
+                const target = e.currentTarget;
+                if (target.src.includes("logo.png") && !target.src.startsWith(window.location.origin + "/logo.png")) {
+                  target.src = "/logo.png";
+                } else {
+                  target.style.display = 'none';
+                  target.parentElement!.innerHTML = '<div class="w-full h-full bg-primary flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>';
+                }
               }} />
             </div>
             <span className="font-black text-lg tracking-tighter">Rachão<span className="text-primary">App</span></span>

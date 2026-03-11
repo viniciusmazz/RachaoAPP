@@ -239,9 +239,14 @@ const Index = ({ group }: IndexProps) => {
         <header className="mb-10 flex flex-col md:flex-row justify-between items-start gap-6">
           <div className="flex items-start gap-4">
             <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-xl border border-slate-100 shrink-0 overflow-hidden">
-              <img src={group.settings.logoUrl || "/logo.png"} alt="RachãoApp Logo" className="w-full h-full object-contain" onError={(e) => {
-                e.currentTarget.style.display = 'none';
-                e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full bg-primary flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>';
+              <img src={group.settings.logoUrl || "logo.png"} alt="RachãoApp Logo" className="w-full h-full object-contain" onError={(e) => {
+                const target = e.currentTarget;
+                if (!group.settings.logoUrl && target.src.includes("logo.png") && !target.src.startsWith(window.location.origin + "/logo.png")) {
+                  target.src = "/logo.png";
+                } else {
+                  target.style.display = 'none';
+                  target.parentElement!.innerHTML = '<div class="w-full h-full bg-primary flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>';
+                }
               }} />
             </div>
             <div>
