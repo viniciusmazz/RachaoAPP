@@ -53,9 +53,12 @@ const Landing = () => {
       {/* Nav */}
       <nav className="border-b bg-white/80 backdrop-blur-xl sticky top-0 z-50">
         <div className="container flex items-center justify-between h-20 max-w-6xl">
-          <div className="flex items-center gap-3 group cursor-pointer">
-            <div className="bg-primary p-2 rounded-xl shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform">
-              <Trophy className="h-6 w-6 text-white" />
+          <div className="flex items-center gap-3 group cursor-pointer" onClick={() => navigate("/")}>
+            <div className="w-12 h-12 bg-white rounded-xl shadow-md border border-slate-100 flex items-center justify-center overflow-hidden">
+              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full bg-primary flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>';
+              }} />
             </div>
             <span className="font-black text-xl tracking-tighter text-slate-900">Rachão<span className="text-primary">App</span></span>
           </div>
@@ -70,7 +73,7 @@ const Landing = () => {
       <section className="container max-w-6xl py-24 md:py-40 text-center relative overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full -z-10">
           <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
         </div>
         
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-secondary text-secondary-foreground text-xs font-black uppercase tracking-widest mb-8 animate-bounce">
@@ -79,7 +82,7 @@ const Landing = () => {
         </div>
         
         <h1 className="text-5xl md:text-8xl font-black tracking-tighter mb-8 leading-[0.9] text-slate-900">
-          Gerencie seu <span className="text-gradient">futebol</span> <br className="hidden md:block" /> como profissional
+          Gerencie seu <span className="text-primary">futebol</span> <br className="hidden md:block" /> como profissional
         </h1>
         <p className="text-lg md:text-2xl text-slate-500 max-w-2xl mx-auto mb-12 font-medium leading-relaxed">
           Estatísticas, escalação inteligente, controle financeiro e URL exclusiva. Tudo o que seu grupo precisa em uma interface moderna e rápida.
@@ -171,7 +174,12 @@ const Landing = () => {
       <footer className="border-t py-12 bg-slate-50">
         <div className="container max-w-6xl flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-primary" />
+            <div className="w-8 h-8 bg-white rounded-lg shadow-sm border border-slate-100 flex items-center justify-center overflow-hidden">
+              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full bg-primary flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>';
+              }} />
+            </div>
             <span className="font-black text-lg tracking-tighter">Rachão<span className="text-primary">App</span></span>
           </div>
           <div className="text-slate-400 font-medium text-sm">

@@ -5,9 +5,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { Palette, Type, BarChart3, Save, Lock, Globe } from "lucide-react";
+import { Palette, Type, BarChart3, Save, Lock, Globe, Upload, Image as ImageIcon } from "lucide-react";
 import type { Group, GroupSettings as GroupSettingsType, StatType, SideConfig } from "@/types/football";
 import { Switch } from "@/components/ui/switch";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface GroupSettingsProps {
   group: Group;
@@ -28,11 +29,23 @@ const STAT_OPTIONS: { value: StatType; label: string; description: string }[] = 
 const GroupSettingsComponent = ({ group, onSave }: GroupSettingsProps) => {
   const [name, setName] = useState(group.name);
   const [slug, setSlug] = useState(group.slug);
+  const [logoUrl, setLogoUrl] = useState<string | null>(group.settings.logoUrl || null);
   const [homeSide, setHomeSide] = useState<SideConfig>({ ...group.settings.sides.home });
   const [awaySide, setAwaySide] = useState<SideConfig>({ ...group.settings.sides.away });
   const [enabledStats, setEnabledStats] = useState<StatType[]>([...group.settings.enabledStats]);
   const [visibility, setVisibility] = useState<"public" | "private">(group.settings.visibility || "public");
   const [saving, setSaving] = useState(false);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, callback: (url: string) => void) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      callback(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const toggleStat = (stat: StatType) => {
     setEnabledStats(prev =>
@@ -43,6 +56,7 @@ const GroupSettingsComponent = ({ group, onSave }: GroupSettingsProps) => {
   const handleSave = async () => {
     setSaving(true);
     const settings: GroupSettingsType = {
+      logoUrl,
       sides: { home: homeSide, away: awaySide },
       enabledStats,
       visibility,
@@ -67,18 +81,62 @@ const GroupSettingsComponent = ({ group, onSave }: GroupSettingsProps) => {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Nome do Grupo</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>URL (slug)</Label>
-            <div className="flex items-center gap-1">
-              <span className="text-sm text-muted-foreground whitespace-nowrap">/</span>
-              <Input
-                value={slug}
-                onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-              />
+          <div className="flex flex-col md:flex-row gap-6 items-start">
+            <div className="space-y-2">
+              <Label>Logo do Grupo</Label>
+              <div className="flex items-center gap-4">
+                <Avatar className="h-20 w-20 rounded-2xl border-2 border-slate-100 shadow-sm">
+                  <AvatarImage src={logoUrl || ""} className="object-contain" />
+                  <AvatarFallback className="bg-slate-50 text-slate-400">
+                    <ImageIcon className="h-8 w-8" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="space-y-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="relative overflow-hidden"
+                    asChild
+                  >
+                    <label className="cursor-pointer flex items-center gap-2">
+                      <Upload className="h-4 w-4" />
+                      Upload Logo
+                      <input 
+                        type="file" 
+                        className="hidden" 
+                        accept="image/*" 
+                        onChange={(e) => handleImageUpload(e, setLogoUrl)} 
+                      />
+                    </label>
+                  </Button>
+                  {logoUrl && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-red-500 hover:text-red-600 hover:bg-red-50 block"
+                      onClick={() => setLogoUrl(null)}
+                    >
+                      Remover
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 space-y-4 w-full">
+              <div className="space-y-2">
+                <Label>Nome do Grupo</Label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>URL (slug)</Label>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">rachao.app.br/</span>
+                  <Input
+                    value={slug}
+                    onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -150,7 +208,32 @@ const GroupSettingsComponent = ({ group, onSave }: GroupSettingsProps) => {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>URL do Escudo (opcional)</Label>
+              <Label>Escudo do Time (Upload)</Label>
+              <div className="flex items-center gap-3">
+                <Avatar className="h-12 w-12 rounded-lg border shadow-sm">
+                  <AvatarImage src={homeSide.logoUrl || ""} className="object-contain" />
+                  <AvatarFallback className="text-[10px]">ESC</AvatarFallback>
+                </Avatar>
+                <Button variant="outline" size="sm" asChild>
+                  <label className="cursor-pointer">
+                    Selecionar Imagem
+                    <input 
+                      type="file" 
+                      className="hidden" 
+                      accept="image/*" 
+                      onChange={(e) => handleImageUpload(e, (url) => setHomeSide(prev => ({ ...prev, logoUrl: url })))} 
+                    />
+                  </label>
+                </Button>
+                {homeSide.logoUrl && (
+                  <Button variant="ghost" size="sm" onClick={() => setHomeSide(prev => ({ ...prev, logoUrl: null }))}>
+                    Limpar
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Ou URL do Escudo</Label>
               <Input
                 value={homeSide.logoUrl || ""}
                 onChange={(e) => setHomeSide(prev => ({ ...prev, logoUrl: e.target.value || null }))}
@@ -190,7 +273,32 @@ const GroupSettingsComponent = ({ group, onSave }: GroupSettingsProps) => {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>URL do Escudo (opcional)</Label>
+              <Label>Escudo do Time (Upload)</Label>
+              <div className="flex items-center gap-3">
+                <Avatar className="h-12 w-12 rounded-lg border shadow-sm">
+                  <AvatarImage src={awaySide.logoUrl || ""} className="object-contain" />
+                  <AvatarFallback className="text-[10px]">ESC</AvatarFallback>
+                </Avatar>
+                <Button variant="outline" size="sm" asChild>
+                  <label className="cursor-pointer">
+                    Selecionar Imagem
+                    <input 
+                      type="file" 
+                      className="hidden" 
+                      accept="image/*" 
+                      onChange={(e) => handleImageUpload(e, (url) => setAwaySide(prev => ({ ...prev, logoUrl: url })))} 
+                    />
+                  </label>
+                </Button>
+                {awaySide.logoUrl && (
+                  <Button variant="ghost" size="sm" onClick={() => setAwaySide(prev => ({ ...prev, logoUrl: null }))}>
+                    Limpar
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Ou URL do Escudo</Label>
               <Input
                 value={awaySide.logoUrl || ""}
                 onChange={(e) => setAwaySide(prev => ({ ...prev, logoUrl: e.target.value || null }))}

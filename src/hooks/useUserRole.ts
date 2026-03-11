@@ -411,7 +411,11 @@ export const useUserRole = (groupId?: string) => {
     }
   }
 
-  const isSuperAdmin = user?.email === 'viniciusmazz@gmail.com'
+  const isSuperAdmin = user?.email?.toLowerCase() === 'viniciusmazz@gmail.com'
+  
+  if (isSuperAdmin) {
+    console.log('User is Super Admin:', user?.email)
+  }
   const isAdmin = role === 'admin' || isSuperAdmin
   const isFinanceiro = role === 'financeiro' || role === 'admin' || isSuperAdmin
   const isApproved = role === 'approved' || role === 'atleta' || role === 'financeiro' || role === 'admin' || isSuperAdmin

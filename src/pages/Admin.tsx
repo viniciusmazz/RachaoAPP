@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole, AppRole } from "@/hooks/useUserRole";
@@ -42,6 +42,8 @@ const Admin = () => {
   const [allUsers, setAllUsers] = useState<AllUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
+  console.log('Admin Page - User:', user?.email, 'isSuperAdmin:', isSuperAdmin, 'role:', role);
+
   useEffect(() => {
     if (!authLoading && !roleLoading) {
       if (!user) {
@@ -56,13 +58,6 @@ const Admin = () => {
       }
     }
   }, [user, authLoading, roleLoading, isSuperAdmin, navigate]);
-
-  useEffect(() => {
-    if (isSuperAdmin) {
-      fetchPendingUsers();
-      fetchAllUsers();
-    }
-  }, [isSuperAdmin, fetchPendingUsers, fetchAllUsers]);
 
   const fetchAllUsers = useCallback(async () => {
     setLoadingUsers(true);
@@ -111,6 +106,13 @@ const Admin = () => {
       setLoadingUsers(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (isSuperAdmin) {
+      fetchPendingUsers();
+      fetchAllUsers();
+    }
+  }, [isSuperAdmin, fetchPendingUsers, fetchAllUsers]);
 
   const handleApprove = async (userRoleId: string, email: string, newRole: AppRole = 'approved') => {
     try {

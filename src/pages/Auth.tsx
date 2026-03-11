@@ -100,15 +100,16 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 relative overflow-hidden">
       {/* Decorative background elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-500/5 rounded-full blur-3xl" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-3xl" />
       
       <Card className="w-full max-w-md border-none shadow-2xl rounded-[2.5rem] overflow-hidden relative z-10 bg-white/80 backdrop-blur-xl">
-        <div className="h-3 w-full bg-gradient-to-r from-primary to-emerald-400" />
+        <div className="h-2 w-full bg-primary" />
         <CardHeader className="text-center pt-10 pb-6">
-          <div className="w-16 h-16 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-6 rotate-3 hover:rotate-0 transition-transform duration-300">
-            <div className="w-10 h-10 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20">
-              <span className="text-white font-black text-2xl">F</span>
-            </div>
+          <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl border border-slate-100 overflow-hidden">
+            <img src="/logo.png" alt="RachãoApp Logo" className="w-full h-full object-contain" onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full bg-primary flex items-center justify-center"><span class="text-white font-black text-3xl">R</span></div>';
+            }} />
           </div>
           <CardTitle className="text-3xl font-black tracking-tight text-slate-900">RachãoApp</CardTitle>
           <CardDescription className="text-slate-500 font-medium mt-2">

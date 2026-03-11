@@ -4,11 +4,13 @@ import type { Group, GroupSettings } from '@/types/football'
 import { toast } from '@/hooks/use-toast'
 
 const DEFAULT_SETTINGS: GroupSettings = {
+  logoUrl: null,
   sides: {
-    home: { name: "Azul", color: "#3B82F6", logoUrl: null },
-    away: { name: "Vermelho", color: "#EF4444", logoUrl: null }
+    home: { name: "Time A", color: "#3B82F6", logoUrl: null },
+    away: { name: "Time B", color: "#EF4444", logoUrl: null }
   },
-  enabledStats: ["goals", "assists", "ownGoals"]
+  enabledStats: ["goals", "assists", "ownGoals"],
+  visibility: 'public'
 }
 
 const mapGroup = (row: {
@@ -19,15 +21,18 @@ const mapGroup = (row: {
   settings: unknown;
   created_at: string;
   updated_at: string;
-}): Group => ({
-  id: row.id,
-  slug: row.slug,
-  name: row.name,
-  ownerId: row.owner_id,
-  settings: (row.settings as unknown as GroupSettings) || DEFAULT_SETTINGS,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
-})
+}): Group => {
+  const settings = (row.settings as unknown as GroupSettings) || {};
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    ownerId: row.owner_id,
+    settings: { ...DEFAULT_SETTINGS, ...settings },
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
 
 export const useGroup = (slug?: string) => {
   const [group, setGroup] = useState<Group | null>(null)

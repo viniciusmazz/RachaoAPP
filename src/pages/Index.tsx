@@ -238,8 +238,11 @@ const Index = ({ group }: IndexProps) => {
       <div className="container py-10 max-w-6xl">
         <header className="mb-10 flex flex-col md:flex-row justify-between items-start gap-6">
           <div className="flex items-start gap-4">
-            <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center shadow-xl shadow-primary/20 shrink-0">
-              <Shield className="h-8 w-8 text-white" />
+            <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-xl border border-slate-100 shrink-0 overflow-hidden">
+              <img src={group.settings.logoUrl || "/logo.png"} alt="RachãoApp Logo" className="w-full h-full object-contain" onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.parentElement!.innerHTML = '<div class="w-full h-full bg-primary flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>';
+              }} />
             </div>
             <div>
               <h1 className="text-3xl md:text-4xl font-black tracking-tight text-slate-900">{group.name}</h1>
@@ -248,7 +251,7 @@ const Index = ({ group }: IndexProps) => {
               </p>
               {user && (
                 <div className="flex items-center gap-2 mt-2">
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                  <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Logado como: {user.email}</p>
                 </div>
               )}
@@ -259,7 +262,7 @@ const Index = ({ group }: IndexProps) => {
               <Button 
                 onClick={handleRequestAccess} 
                 disabled={requestingAccess}
-                className="rounded-xl font-bold shadow-lg shadow-primary/20 bg-emerald-600 hover:bg-emerald-700"
+                className="rounded-xl font-bold shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90"
               >
                 {requestingAccess ? "Solicitando..." : "Solicitar Acesso"}
               </Button>
@@ -299,7 +302,7 @@ const Index = ({ group }: IndexProps) => {
               <Button 
                 onClick={handleRequestAccess} 
                 disabled={requestingAccess}
-                className="rounded-xl font-bold h-12 px-8 shadow-lg shadow-primary/20 bg-emerald-600 hover:bg-emerald-700"
+                className="rounded-xl font-bold h-12 px-8 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90"
               >
                 {requestingAccess ? "Solicitando..." : "Solicitar Acesso"}
               </Button>

@@ -57,6 +57,7 @@ export interface SideConfig {
 }
 
 export interface GroupSettings {
+  logoUrl?: string | null;
   sides: {
     home: SideConfig;
     away: SideConfig;

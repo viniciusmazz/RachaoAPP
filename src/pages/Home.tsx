@@ -91,7 +91,7 @@ const Home = () => {
       <div className="container py-12 max-w-4xl">
         <header className="mb-12 flex justify-between items-center">
           <div>
-            <h1 className="text-4xl md:text-5xl font-black tracking-tight text-gradient">
+            <h1 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900">
               Meus Grupos
             </h1>
             <p className="text-muted-foreground mt-3 text-lg max-w-md">
@@ -165,7 +165,7 @@ const Home = () => {
                         >
                           <div>
                             <p className="font-bold text-slate-900">{g.name}</p>
-                            <p className="text-xs text-muted-foreground font-mono">futebol.app/{g.slug}</p>
+                            <p className="text-xs text-muted-foreground font-mono">rachao.app.br/{g.slug}</p>
                           </div>
                           <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                         </div>
@@ -214,7 +214,7 @@ const Home = () => {
                     <div className="space-y-2">
                       <Label htmlFor="group-slug" className="text-sm font-semibold">URL do Grupo</Label>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground font-mono bg-muted px-2 py-2 rounded-lg border">futebol.app/</span>
+                        <span className="text-sm text-muted-foreground font-mono bg-muted px-2 py-2 rounded-lg border">rachao.app.br/</span>
                         <Input
                           id="group-slug"
                           value={newSlug}
@@ -256,7 +256,7 @@ const Home = () => {
                     className="group cursor-pointer border-none shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 rounded-3xl overflow-hidden bg-card"
                     onClick={() => navigate(`/${group.slug}`)}
                   >
-                    <div className="h-2 w-full bg-gradient-to-r from-primary to-emerald-400" />
+                    <div className="h-1 w-full bg-primary" />
                     <CardHeader className="pb-4">
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-xl font-bold group-hover:text-primary transition-colors">
@@ -267,7 +267,7 @@ const Home = () => {
                         </div>
                       </div>
                       <CardDescription className="flex items-center gap-1 font-mono text-xs">
-                        <span className="text-primary/60">futebol.app/</span>
+                        <span className="text-primary/60">rachao.app.br/</span>
                         <span className="font-bold">{group.slug}</span>
                       </CardDescription>
                     </CardHeader>
