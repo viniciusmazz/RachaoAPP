@@ -1,0 +1,5 @@
+{
+  "name": "RachãoApp",
+  "description": "Aplicativo de gerenciamento de futebol com integração Supabase.",
+  "requestFramePermissions": []
+}

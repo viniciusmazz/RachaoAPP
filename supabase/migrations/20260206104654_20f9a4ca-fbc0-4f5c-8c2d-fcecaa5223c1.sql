@@ -1,0 +1,1 @@
+ALTER TABLE public.matches ADD COLUMN observations TEXT DEFAULT NULL;
