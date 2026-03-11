@@ -11,7 +11,7 @@ const FEATURES = [
   { icon: BarChart3, title: "Estatísticas Completas", desc: "Artilharia, assistências, field goals, goleiros e mais." },
   { icon: Trophy, title: "Escalação Inteligente", desc: "Sugestão automática de times equilibrados por habilidade." },
   { icon: DollarSign, title: "Controle Financeiro", desc: "Mensalidades, convidados, caixa com entradas e saídas." },
-  { icon: Shield, title: "URL Exclusiva", desc: "Seu grupo com endereço próprio: futebol.lovable.app/seu-time" },
+  { icon: Shield, title: "URL Exclusiva", desc: "Seu grupo com endereço próprio e personalizado." },
   { icon: Zap, title: "Acesso Híbrido", desc: "Estatísticas públicas, gestão restrita ao dono do grupo." },
 ];
 
