@@ -22,12 +22,33 @@ export const useAuth = () => {
     )
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error('Auth session error:', error.message);
+        // If the refresh token is invalid, sign out and clear local storage
+        if (error.message.includes('refresh_token_not_found') || 
+            error.message.includes('refresh token') || 
+            error.message.includes('Invalid Refresh Token')) {
+          console.warn('Invalid refresh token detected, clearing session...');
+          supabase.auth.signOut();
+          
+          // Explicitly clear any supabase auth keys from localStorage as a fallback
+          Object.keys(localStorage).forEach(key => {
+            if (key.includes('supabase.auth.token') || key.startsWith('sb-')) {
+              localStorage.removeItem(key);
+            }
+          });
+        }
+      }
+      
       if (mounted) {
         setSession(session)
         setUser(session?.user ?? null)
         setLoading(false)
       }
+    }).catch(err => {
+      console.error('Unexpected auth error:', err);
+      if (mounted) setLoading(false);
     })
 
     return () => {

@@ -48,19 +48,25 @@ export const useGroup = (slug?: string) => {
     let mounted = true
     const fetchGroup = async () => {
       try {
+        console.log('Fetching group with slug:', slug);
         const { data, error } = await supabase
           .from('groups')
           .select('*')
           .eq('slug', slug)
           .maybeSingle()
 
-        if (error) throw error
+        if (error) {
+          console.error('Supabase error fetching group:', error);
+          throw error;
+        }
 
         if (mounted) {
           if (data) {
+            console.log('Group found:', data.name);
             setGroup(mapGroup(data))
             setNotFound(false)
           } else {
+            console.warn('Group not found for slug:', slug);
             setGroup(null)
             setNotFound(true)
           }
