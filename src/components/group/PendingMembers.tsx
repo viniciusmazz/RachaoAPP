@@ -15,11 +15,12 @@ interface PendingMembersProps {
 }
 
 const PendingMembers = ({ groupId }: PendingMembersProps) => {
-  const { pendingUsers, fetchPendingUsers, approveUser, rejectUser } = useUserRole(groupId);
+  const { pendingUsers, fetchPendingUsers, approveUser, rejectUser, role, isAdmin } = useUserRole(groupId);
 
   useEffect(() => {
+    console.log('PendingMembers: useEffect triggering fetchPendingUsers', { groupId, role, isAdmin });
     fetchPendingUsers();
-  }, [groupId, fetchPendingUsers]);
+  }, [groupId, fetchPendingUsers, role, isAdmin]);
 
   const handleApprove = async (userId: string, role: AppRole) => {
     await approveUser(userId, role);

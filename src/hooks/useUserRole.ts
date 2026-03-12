@@ -48,6 +48,7 @@ export const useUserRole = (groupId?: string) => {
     }
 
     const fetchRole = async () => {
+      console.log('useUserRole: fetchRole starting', { userId: user.id, groupId });
       try {
         setLoading(true)
         
@@ -59,8 +60,14 @@ export const useUserRole = (groupId?: string) => {
             .eq('id', groupId)
             .maybeSingle()
           
+          if (groupError) {
+            console.error('useUserRole: Error fetching group', groupError);
+          }
+
           if (!groupError && groupData) {
+            console.log('useUserRole: Group data found', { ownerId: groupData.owner_id, userId: user.id });
             if (groupData.owner_id === user.id) {
+              console.log('useUserRole: User is owner');
               setRole('admin')
               setLoading(false)
               return
@@ -68,7 +75,9 @@ export const useUserRole = (groupId?: string) => {
 
             // 2. Check group-specific roles in settings
             const settings = groupData.settings as unknown as GroupSettings
+            console.log('useUserRole: Checking settings roles', settings?.roles);
             if (settings?.roles && settings.roles[user.id]) {
+              console.log('useUserRole: Role found in settings', settings.roles[user.id]);
               setRole(settings.roles[user.id] as AppRole)
               setLoading(false)
               return
@@ -83,6 +92,7 @@ export const useUserRole = (groupId?: string) => {
               .maybeSingle()
             
             if (!playerError && playerData) {
+              console.log('useUserRole: User linked to player, setting role to approved');
               setRole('approved')
               setLoading(false)
               return
@@ -123,10 +133,17 @@ export const useUserRole = (groupId?: string) => {
   }, [user, groupId])
 
   const fetchPendingUsers = useCallback(async () => {
-    if (!user || role !== 'admin') return
+    const isActuallyAdmin = role === 'admin' || isSuperAdmin;
+    console.log('fetchPendingUsers called', { userId: user?.id, role, isSuperAdmin, isActuallyAdmin, groupId });
+    
+    if (!user || !isActuallyAdmin) {
+      console.log('fetchPendingUsers: Not authorized or no user', { user: !!user, isActuallyAdmin });
+      return;
+    }
 
     try {
       if (groupId) {
+        console.log('fetchPendingUsers: Fetching for group', groupId);
         // Group-specific pending users from settings
         const { data: groupData, error: groupError } = await supabase
           .from('groups')
@@ -134,13 +151,18 @@ export const useUserRole = (groupId?: string) => {
           .eq('id', groupId)
           .single()
         
-        if (groupError) throw groupError
+        if (groupError) {
+          console.error('fetchPendingUsers: Error fetching group data', groupError);
+          throw groupError;
+        }
         
         const settings = groupData.settings as unknown as GroupSettings
         const roles = settings?.roles || {}
         const pendingLinks = settings?.pendingLinks || {}
         const pendingUserIds = Object.keys(roles).filter(id => roles[id] === 'pending')
         
+        console.log('fetchPendingUsers: Pending user IDs found', pendingUserIds);
+
         if (pendingUserIds.length === 0) {
           setPendingUsers([])
           return
@@ -151,7 +173,12 @@ export const useUserRole = (groupId?: string) => {
           .select('user_id, email, name')
           .in('user_id', pendingUserIds)
 
-        if (profilesError) throw profilesError
+        if (profilesError) {
+          console.error('fetchPendingUsers: Error fetching profiles', profilesError);
+          // Don't throw, just proceed with what we have
+        }
+
+        console.log('fetchPendingUsers: Profiles fetched', profilesData?.length || 0);
 
         // Fetch players to get names for claimed_player_id
         const claimedPlayerIds = Object.values(pendingLinks).filter(id => !!id) as string[]
@@ -166,17 +193,23 @@ export const useUserRole = (groupId?: string) => {
           playersMap = new Map(playersData?.map(p => [p.id, p.name]) || [])
         }
 
-        const pending: PendingUser[] = profilesData.map(p => ({
-          id: p.user_id, // Use user_id as id for group-specific roles
-          user_id: p.user_id,
-          role: 'pending',
-          created_at: new Date().toISOString(), // We don't track this in settings yet
-          email: p.email,
-          name: p.name,
-          claimed_player_id: pendingLinks[p.user_id],
-          claimed_player_name: pendingLinks[p.user_id] ? playersMap.get(pendingLinks[p.user_id]) : undefined
-        }))
+        const profilesMap = new Map(profilesData?.map(p => [p.user_id, p]) || [])
 
+        const pending: PendingUser[] = pendingUserIds.map(uId => {
+          const p = profilesMap.get(uId);
+          return {
+            id: uId,
+            user_id: uId,
+            role: 'pending',
+            created_at: new Date().toISOString(),
+            email: p?.email || 'Email não disponível',
+            name: p?.name || null,
+            claimed_player_id: pendingLinks[uId],
+            claimed_player_name: pendingLinks[uId] ? playersMap.get(pendingLinks[uId]) : undefined
+          }
+        })
+
+        console.log('fetchPendingUsers: Final pending list', pending.length);
         setPendingUsers(pending)
       } else {
         // Global pending users (legacy)
@@ -220,8 +253,16 @@ export const useUserRole = (groupId?: string) => {
   }, [user, role, groupId])
 
   const approveUser = async (userId: string, targetRole: AppRole = 'approved') => {
+    const isActuallyAdmin = role === 'admin' || isSuperAdmin;
+    if (!user || !isActuallyAdmin) {
+      console.error('approveUser: Not authorized', { role, isSuperAdmin });
+      return { success: false, error: 'Não autorizado' };
+    }
+
     try {
       if (groupId) {
+        console.log('approveUser: Approving for group', { groupId, userId, targetRole });
+        // Group-specific approval
         const { data: groupData, error: groupError } = await supabase
           .from('groups')
           .select('settings')
@@ -255,6 +296,7 @@ export const useUserRole = (groupId?: string) => {
           .eq('id', groupId)
         
         if (updateError) throw updateError
+        console.log('approveUser: Success');
       } else {
         const { error } = await supabase
           .from('user_roles')
@@ -386,8 +428,16 @@ export const useUserRole = (groupId?: string) => {
   }, [groupId])
 
   const rejectUser = async (userId: string) => {
+    const isActuallyAdmin = role === 'admin' || isSuperAdmin;
+    if (!user || !isActuallyAdmin) {
+      console.error('rejectUser: Not authorized', { role, isSuperAdmin });
+      return { success: false, error: 'Não autorizado' };
+    }
+
     try {
       if (groupId) {
+        console.log('rejectUser: Rejecting for group', { groupId, userId });
+        // Group-specific rejection
         const { data: groupData, error: groupError } = await supabase
           .from('groups')
           .select('settings')
@@ -409,6 +459,7 @@ export const useUserRole = (groupId?: string) => {
           .eq('id', groupId)
         
         if (updateError) throw updateError
+        console.log('rejectUser: Success');
       } else {
         const { error } = await supabase
           .from('user_roles')
@@ -428,6 +479,7 @@ export const useUserRole = (groupId?: string) => {
 
   const requestAccess = async (playerId?: string) => {
     if (!user || !groupId) return { success: false }
+    console.log('requestAccess: Starting', { userId: user.id, groupId, playerId });
     try {
       const { data: groupData, error: groupError } = await supabase
         .from('groups')
@@ -435,18 +487,28 @@ export const useUserRole = (groupId?: string) => {
         .eq('id', groupId)
         .single()
       
-      if (groupError) throw groupError
+      if (groupError) {
+        console.error('requestAccess: Error fetching group', groupError);
+        throw groupError
+      }
       
       const settings = groupData.settings as unknown as GroupSettings
       const roles = { ...(settings?.roles || {}), [user.id]: 'pending' }
       const pendingLinks = { ...(settings?.pendingLinks || {}), [user.id]: playerId }
+      
+      console.log('requestAccess: Updating group settings', { roles, pendingLinks });
       
       const { error: updateError } = await supabase
         .from('groups')
         .update({ settings: { ...settings, roles, pendingLinks } })
         .eq('id', groupId)
       
-      if (updateError) throw updateError
+      if (updateError) {
+        console.error('requestAccess: Error updating group', updateError);
+        throw updateError
+      }
+      
+      console.log('requestAccess: Success');
       setRole('pending')
       return { success: true }
     } catch (error) {
@@ -456,17 +518,6 @@ export const useUserRole = (groupId?: string) => {
   }
 
   const isSuperAdmin = user?.email ? user.email.toLowerCase().trim() === 'viniciusmazz@gmail.com' : false;
-  
-  useEffect(() => {
-    if (user) {
-      console.log('SuperAdmin Check:', {
-        email: user.email,
-        normalized: user.email?.toLowerCase().trim(),
-        target: 'viniciusmazz@gmail.com',
-        match: isSuperAdmin
-      });
-    }
-  }, [user, isSuperAdmin]);
   const isAdmin = role === 'admin' || isSuperAdmin
   const isFinanceiro = role === 'financeiro' || role === 'admin' || isSuperAdmin
   const isApproved = role === 'approved' || role === 'atleta' || role === 'financeiro' || role === 'admin' || isSuperAdmin
