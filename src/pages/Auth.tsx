@@ -53,21 +53,7 @@ const Auth = () => {
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [isResettingPassword, setIsResettingPassword] = useState(false)
-  const [isRecovering, setIsRecovering] = useState(false)
-  const [newPassword, setNewPassword] = useState('')
   const navigate = useNavigate()
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setIsRecovering(true)
-      }
-    })
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
 
   useEffect(() => {
     // Check if user is already logged in
@@ -164,7 +150,7 @@ const Auth = () => {
     }
     setLoading(true)
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth`,
+      redirectTo: `${window.location.origin}/reset-password`,
     })
     if (error) {
       toast({
@@ -178,29 +164,6 @@ const Auth = () => {
         description: "Verifique sua caixa de entrada para redefinir sua senha."
       })
       setIsResettingPassword(false)
-    }
-    setLoading(false)
-  }
-
-  const handleUpdatePassword = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    const { error } = await supabase.auth.updateUser({ password: newPassword })
-    if (error) {
-      toast({
-        title: "Erro ao atualizar senha",
-        description: error.message,
-        variant: "destructive"
-      })
-    } else {
-      toast({
-        title: "Senha atualizada!",
-        description: "Sua senha foi alterada com sucesso. Você já pode fazer login."
-      })
-      setIsRecovering(false)
-      setIsResettingPassword(false)
-      // Sign out to force fresh login if needed, or just navigate
-      await supabase.auth.signOut()
     }
     setLoading(false)
   }
@@ -223,36 +186,11 @@ const Auth = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="px-8 pb-10">
-          {isRecovering ? (
-            <form onSubmit={handleUpdatePassword} className="space-y-5">
-              <div className="text-center mb-6">
-                <h3 className="text-lg font-bold text-slate-900">Definir Nova Senha</h3>
-                <p className="text-sm text-slate-500">Crie uma nova senha para sua conta.</p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="new-password" className="text-xs font-bold uppercase tracking-widest text-slate-400 ml-1">Nova Senha</Label>
-                <Input
-                  id="new-password"
-                  type="password"
-                  placeholder="Mínimo 6 caracteres"
-                  className="h-12 rounded-2xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                  minLength={6}
-                />
-              </div>
-              <Button type="submit" className="w-full h-14 rounded-2xl text-base font-bold shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all mt-4" disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                Atualizar Senha
-              </Button>
-            </form>
-          ) : (
-            <Tabs defaultValue="signin" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-8 p-1 bg-slate-100 rounded-2xl h-12">
-                <TabsTrigger value="signin" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Entrar</TabsTrigger>
-                <TabsTrigger value="signup" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Cadastrar</TabsTrigger>
-              </TabsList>
+          <Tabs defaultValue="signin" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-8 p-1 bg-slate-100 rounded-2xl h-12">
+              <TabsTrigger value="signin" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Entrar</TabsTrigger>
+              <TabsTrigger value="signup" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Cadastrar</TabsTrigger>
+            </TabsList>
 
               <TabsContent value="signin" className="mt-0">
               {isResettingPassword ? (
@@ -396,7 +334,6 @@ const Auth = () => {
               </form>
             </TabsContent>
           </Tabs>
-          )}
         </CardContent>
       </Card>
     </div>
