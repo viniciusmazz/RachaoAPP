@@ -7,7 +7,7 @@ import NotFound from "./NotFound";
 const GroupPage = () => {
   const { slug } = useParams<{ slug: string }>();
   console.log('GroupPage rendering for slug:', slug);
-  const { group, loading, notFound } = useGroup(slug);
+  const { group, loading, notFound, refreshGroup } = useGroup(slug);
 
   useEffect(() => {
     if (!loading) {
@@ -34,7 +34,7 @@ const GroupPage = () => {
     return <NotFound />;
   }
 
-  return <Index group={group} />;
+  return <Index group={group} refreshGroup={refreshGroup} />;
 };
 
 export default GroupPage;

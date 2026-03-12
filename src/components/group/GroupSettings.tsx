@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +30,17 @@ const GroupSettingsComponent = ({ group, onSave }: GroupSettingsProps) => {
   const [name, setName] = useState(group.name);
   const [slug, setSlug] = useState(group.slug);
   const [logoUrl, setLogoUrl] = useState<string | null>(group.settings.logoUrl || null);
+  
+  // Sync state when group prop updates
+  useEffect(() => {
+    setLogoUrl(group.settings.logoUrl || null);
+    setName(group.name);
+    setSlug(group.slug);
+    setHomeSide({ ...group.settings.sides.home });
+    setAwaySide({ ...group.settings.sides.away });
+    setEnabledStats([...group.settings.enabledStats]);
+    setVisibility(group.settings.visibility || "public");
+  }, [group]);
   const [homeSide, setHomeSide] = useState<SideConfig>({ ...group.settings.sides.home });
   const [awaySide, setAwaySide] = useState<SideConfig>({ ...group.settings.sides.away });
   const [enabledStats, setEnabledStats] = useState<StatType[]>([...group.settings.enabledStats]);

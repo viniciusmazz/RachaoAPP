@@ -26,9 +26,10 @@ import type { Teams, Group, MatchEvent } from "@/types/football";
 
 interface IndexProps {
   group: Group;
+  refreshGroup?: () => Promise<void>;
 }
 
-const Index = ({ group }: IndexProps) => {
+const Index = ({ group, refreshGroup }: IndexProps) => {
   const navigate = useNavigate();
   const { user, loading: authLoading, signOut } = useAuth();
   const { 
@@ -240,11 +241,18 @@ const Index = ({ group }: IndexProps) => {
         <header className="mb-10 flex flex-col md:flex-row justify-between items-start gap-6">
           <div className="flex items-start gap-4">
             <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-xl border border-slate-100 shrink-0 overflow-hidden">
-              <img 
-                src={group.settings.logoUrl || `/logo.png?t=${Date.now()}`} 
-                alt="RachãoApp Logo" 
-                className="w-full h-full object-contain" 
-              />
+              {group.settings.logoUrl ? (
+                <img 
+                  src={group.settings.logoUrl} 
+                  alt={group.name} 
+                  className="w-full h-full object-contain" 
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-full h-full bg-primary/5 flex items-center justify-center text-primary font-black text-2xl">
+                  {group.name.substring(0, 1).toUpperCase()}
+                </div>
+              )}
             </div>
             <div>
               <h1 className="text-3xl md:text-4xl font-black tracking-tight text-slate-900">{group.name}</h1>
@@ -437,7 +445,11 @@ const Index = ({ group }: IndexProps) => {
                   <GroupSettingsComponent
                     group={group}
                     onSave={async (settings, name, slug) => {
-                      return await updateGroup(group.id, { settings, name, slug });
+                      const success = await updateGroup(group.id, { settings, name, slug });
+                      if (success && refreshGroup) {
+                        await refreshGroup();
+                      }
+                      return success;
                     }}
                   />
                 </TabsContent>

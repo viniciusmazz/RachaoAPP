@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import type { Group, GroupSettings } from '@/types/football'
 import { toast } from '@/hooks/use-toast'
@@ -22,13 +22,31 @@ const mapGroup = (row: {
   created_at: string;
   updated_at: string;
 }): Group => {
-  const settings = (row.settings as unknown as GroupSettings) || {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dbSettings = (row.settings as any) || {};
+  
+  // Deep merge sides to avoid losing data
+  const settings: GroupSettings = {
+    ...DEFAULT_SETTINGS,
+    ...dbSettings,
+    sides: {
+      home: { 
+        ...DEFAULT_SETTINGS.sides.home, 
+        ...(dbSettings.sides?.home || {}) 
+      },
+      away: { 
+        ...DEFAULT_SETTINGS.sides.away, 
+        ...(dbSettings.sides?.away || {}) 
+      }
+    }
+  };
+
   return {
     id: row.id,
     slug: row.slug,
     name: row.name,
     ownerId: row.owner_id,
-    settings: { ...DEFAULT_SETTINGS, ...settings },
+    settings,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -39,54 +57,47 @@ export const useGroup = (slug?: string) => {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
 
-  useEffect(() => {
+  const fetchGroup = useCallback(async () => {
     if (!slug) {
       setLoading(false)
       return
     }
 
-    let mounted = true
-    const fetchGroup = async () => {
-      try {
-        console.log('Fetching group with slug:', slug);
-        const { data, error } = await supabase
-          .from('groups')
-          .select('*')
-          .eq('slug', slug)
-          .maybeSingle()
+    try {
+      console.log('Fetching group with slug:', slug);
+      const { data, error } = await supabase
+        .from('groups')
+        .select('*')
+        .eq('slug', slug)
+        .maybeSingle()
 
-        if (error) {
-          console.error('Supabase error fetching group:', error);
-          if (error.code === 'PGRST301' || error.message.includes('JWT')) {
-            console.error('Permission denied. Please check Supabase RLS policies.');
-          }
-          throw error;
-        }
-
-        if (mounted) {
-          if (data) {
-            console.log('Group found:', data.name);
-            setGroup(mapGroup(data))
-            setNotFound(false)
-          } else {
-            console.warn('Group not found for slug:', slug);
-            setGroup(null)
-            setNotFound(true)
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching group:', error)
-        if (mounted) setNotFound(true)
-      } finally {
-        if (mounted) setLoading(false)
+      if (error) {
+        console.error('Supabase error fetching group:', error);
+        throw error;
       }
+
+      if (data) {
+        console.log('Group found:', data.name);
+        setGroup(mapGroup(data))
+        setNotFound(false)
+      } else {
+        console.warn('Group not found for slug:', slug);
+        setGroup(null)
+        setNotFound(true)
+      }
+    } catch (error) {
+      console.error('Error fetching group:', error)
+      setNotFound(true)
+    } finally {
+      setLoading(false)
     }
+  }, [slug]);
 
+  useEffect(() => {
     fetchGroup()
-    return () => { mounted = false }
-  }, [slug])
+  }, [fetchGroup])
 
-  return { group, loading, notFound }
+  return { group, loading, notFound, refreshGroup: fetchGroup }
 }
 
 export const useUserGroups = () => {
