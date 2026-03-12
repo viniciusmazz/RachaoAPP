@@ -123,6 +123,7 @@ export const useUserGroups = () => {
         .from('groups')
         .select('*')
         .eq('owner_id', session.user.id)
+        .neq('slug', 'app-settings')
 
       if (ownedError) throw ownedError
 
@@ -276,6 +277,7 @@ export const useUserGroups = () => {
         .from('groups')
         .select('*')
         .ilike('name', `%${query}%`)
+        .neq('slug', 'app-settings')
         .limit(10)
       
       if (error) throw error

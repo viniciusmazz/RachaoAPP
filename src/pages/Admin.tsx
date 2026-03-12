@@ -41,8 +41,15 @@ const Admin = () => {
 
   const [allUsers, setAllUsers] = useState<AllUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const { appLogo: currentLogo, loading: settingsLoading } = useAppSettings();
   const [appLogo, setAppLogo] = useState<string | null>(null);
   const [savingLogo, setSavingLogo] = useState(false);
+
+  useEffect(() => {
+    if (currentLogo) {
+      setAppLogo(currentLogo);
+    }
+  }, [currentLogo]);
 
   console.log('Admin Page - User:', user?.email, 'isSuperAdmin:', isSuperAdmin, 'role:', role);
 
@@ -208,6 +215,11 @@ const Admin = () => {
         title: "Configurações salvas",
         description: "O logo do aplicativo foi atualizado com sucesso no banco de dados."
       });
+      
+      // Force a small delay then reload to ensure all components see the change
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error: any) {
       console.error('Error saving app logo:', error);
       toast({

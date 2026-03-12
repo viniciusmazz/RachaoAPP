@@ -12,6 +12,30 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import Landing from "./Landing";
 import type { Group } from "@/types/football";
 import { toast } from "@/hooks/use-toast";
+import { useAppSettings } from "@/hooks/useAppSettings";
+import logoUrl from "/logo.png";
+
+const LogoImage = ({ size, fallbackText }: { size: string, fallbackText: string }) => {
+  const [error, setError] = useState(false);
+  const { appLogo } = useAppSettings();
+  
+  if (error) {
+    return (
+      <div className={`${size} flex items-center justify-center text-primary font-black text-xl`}>
+        {fallbackText}
+      </div>
+    );
+  }
+
+  return (
+    <img 
+      src={appLogo || logoUrl} 
+      alt="Logo" 
+      className={`${size} object-contain`}
+      onError={() => setError(true)}
+    />
+  );
+};
 
 const Home = () => {
   const navigate = useNavigate();
@@ -90,16 +114,17 @@ const Home = () => {
     <div className="min-h-screen bg-background selection:bg-primary/20">
       <div className="container py-12 max-w-4xl">
         <header className="mb-12 flex justify-between items-center">
-          <div>
-            <h1 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900">
-              Meus Grupos
-            </h1>
-            <p className="text-muted-foreground mt-3 text-lg max-w-md">
-              Gerencie seus grupos de futebol e acompanhe estatísticas em tempo real.
-            </p>
-            <div className="flex items-center gap-2 mt-4 px-3 py-1.5 bg-secondary rounded-full w-fit">
-              <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-              <p className="text-xs font-medium text-secondary-foreground">Logado como: {user.email}</p>
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-primary/5 rounded-2xl shadow-md border border-slate-100 flex items-center justify-center overflow-hidden shrink-0">
+              <LogoImage size="h-16 w-16" fallbackText="R" />
+            </div>
+            <div>
+              <h1 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900">
+                Meus Grupos
+              </h1>
+              <p className="text-muted-foreground mt-1 text-lg max-w-md">
+                Gerencie seus grupos de futebol.
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
