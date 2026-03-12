@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +15,27 @@ const FEATURES = [
   { icon: Shield, title: "URL Exclusiva", desc: "Seu grupo com endereço próprio e personalizado." },
   { icon: Zap, title: "Acesso Híbrido", desc: "Estatísticas públicas, gestão restrita ao dono do grupo." },
 ];
+
+const LogoImage = ({ size, fallbackText }: { size: string, fallbackText: string }) => {
+  const [error, setError] = useState(false);
+  
+  if (error) {
+    return (
+      <div className={`${size} flex items-center justify-center text-primary font-black text-xl`}>
+        {fallbackText}
+      </div>
+    );
+  }
+
+  return (
+    <img 
+      src="/logo.png" 
+      alt="Logo" 
+      className={`${size} object-contain`}
+      onError={() => setError(true)}
+    />
+  );
+};
 
 const PLANS = [
   { 
@@ -60,23 +81,7 @@ const Landing = () => {
         <div className="container flex items-center justify-between h-20 max-w-6xl">
           <div className="flex items-center gap-3 group cursor-pointer" onClick={() => navigate("/")}>
             <div className="w-12 h-12 bg-primary/5 rounded-xl shadow-md border border-slate-100 flex items-center justify-center overflow-hidden">
-              <img 
-                src="/logo.png" 
-                alt="Logo" 
-                className="w-full h-full object-contain" 
-                onError={(e) => {
-                  console.error("Erro ao carregar logo.png");
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                  const parent = target.parentElement;
-                  if (parent) {
-                    const fallback = document.createElement('div');
-                    fallback.className = "w-full h-full flex items-center justify-center text-primary font-black text-xl";
-                    fallback.innerText = "R";
-                    parent.appendChild(fallback);
-                  }
-                }} 
-              />
+              <LogoImage size="h-12 w-12" fallbackText="R" />
             </div>
             <span className="font-black text-xl tracking-tighter text-slate-900">Rachão<span className="text-primary">App</span></span>
           </div>
@@ -193,15 +198,7 @@ const Landing = () => {
         <div className="container max-w-6xl flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-primary/5 rounded-lg shadow-sm border border-slate-100 flex items-center justify-center overflow-hidden">
-              <img 
-                src="/logo.png" 
-                alt="Logo" 
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                }}
-              />
+              <LogoImage size="h-8 w-8" fallbackText="R" />
             </div>
             <span className="font-black text-lg tracking-tighter">Rachão<span className="text-primary">App</span></span>
           </div>

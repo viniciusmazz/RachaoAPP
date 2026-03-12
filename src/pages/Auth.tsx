@@ -9,6 +9,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from '@/hooks/use-toast'
 import { Loader2 } from 'lucide-react'
 
+const LogoImage = () => {
+  const [error, setError] = useState(false);
+  
+  if (error) {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-primary font-black text-2xl">
+        R
+      </div>
+    );
+  }
+
+  return (
+    <img 
+      src="/logo.png" 
+      alt="RachãoApp Logo" 
+      className="w-full h-full object-contain"
+      onError={() => setError(true)}
+    />
+  );
+};
+
 const Auth = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -174,7 +195,7 @@ const Auth = () => {
         <div className="h-2 w-full bg-primary" />
         <CardHeader className="text-center pt-10 pb-6">
           <div className="w-20 h-20 bg-primary/5 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl border border-slate-100 overflow-hidden">
-            <img src="/logo.png" alt="RachãoApp Logo" className="w-full h-full object-contain" />
+            <LogoImage />
           </div>
           <CardTitle className="text-3xl font-black tracking-tight text-slate-900">RachãoApp</CardTitle>
           <CardDescription className="text-slate-500 font-medium mt-2">
