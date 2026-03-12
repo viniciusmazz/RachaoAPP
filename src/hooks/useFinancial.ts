@@ -135,7 +135,7 @@ export const useFinancial = (groupId?: string) => {
     }
   }
 
-  const togglePayment = async (playerId: string, month: number, year: number, amount: number) => {
+  const togglePayment = async (playerId: string, month: number, year: number, amount: number, playerName?: string) => {
     if (!groupId) return
     const existing = payments.find(p => p.playerId === playerId && p.month === month && p.year === year)
     try {
@@ -145,6 +145,27 @@ export const useFinancial = (groupId?: string) => {
           paid: newPaid,
           paid_at: newPaid ? new Date().toISOString() : null,
         }).eq('id', existing.id)
+
+        if (newPaid) {
+          await addCashEntry({
+            type: 'income',
+            category: 'mensalidade',
+            description: `Mensalidade: ${playerName || 'Jogador'} - ${month}/${year}`,
+            amount: amount,
+            date: new Date().toISOString(),
+            playerId: playerId,
+          })
+        } else {
+          // Try to remove the automatic entry
+          const autoEntry = cashEntries.find(e => 
+            e.playerId === playerId && 
+            e.category === 'mensalidade' && 
+            e.description.includes(`${month}/${year}`)
+          )
+          if (autoEntry) {
+            await deleteCashEntry(autoEntry.id)
+          }
+        }
       } else {
         await supabase.from('payments').insert({
           group_id: groupId,
@@ -154,6 +175,15 @@ export const useFinancial = (groupId?: string) => {
           amount,
           paid: true,
           paid_at: new Date().toISOString(),
+        })
+
+        await addCashEntry({
+          type: 'income',
+          category: 'mensalidade',
+          description: `Mensalidade: ${playerName || 'Jogador'} - ${month}/${year}`,
+          amount: amount,
+          date: new Date().toISOString(),
+          playerId: playerId,
         })
       }
       await loadAll()

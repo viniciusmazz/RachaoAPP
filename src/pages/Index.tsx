@@ -20,6 +20,7 @@ import GroupSettingsComponent from "@/components/group/GroupSettings";
 import FinancialModule from "@/components/financial/FinancialModule";
 import PendingMembers from "@/components/group/PendingMembers";
 import GroupMembers from "@/components/group/GroupMembers";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { useUserGroups } from "@/hooks/useGroup";
 import type { Teams, Group, MatchEvent } from "@/types/football";
 
@@ -424,7 +425,9 @@ const Index = ({ group }: IndexProps) => {
                 <TabsContent value="financeiro" className="mt-0 focus-visible:ring-0">
                   <section aria-labelledby="financeiro-title" className="space-y-6">
                     <h2 id="financeiro-title" className="sr-only">Controle Financeiro</h2>
-                    <FinancialModule groupId={group.id} players={players} isOwner={isOwner} />
+                    <ErrorBoundary>
+                      <FinancialModule groupId={group.id} players={players} isOwner={isOwner} />
+                    </ErrorBoundary>
                   </section>
                 </TabsContent>
               )}

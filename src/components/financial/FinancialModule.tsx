@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -56,12 +56,12 @@ export default function FinancialModule({ groupId, players, isOwner }: Financial
   const [entryDialogOpen, setEntryDialogOpen] = useState(false);
 
   // Update form when config loads
-  useState(() => {
+  useEffect(() => {
     if (config) {
       setMonthlyFee(config.monthlyFee.toString());
       setGuestFee(config.guestFee.toString());
     }
-  });
+  }, [config]);
 
   const mensalistas = players.filter(p => p.type === "mensalista");
   const fee = config?.monthlyFee || 0;
@@ -201,7 +201,7 @@ export default function FinancialModule({ groupId, players, isOwner }: Financial
                             <Button
                               size="sm"
                               variant={isPaid ? "outline" : "default"}
-                              onClick={() => togglePayment(player.id, selectedMonth, selectedYear, fee)}
+                              onClick={() => togglePayment(player.id, selectedMonth, selectedYear, fee, player.name)}
                             >
                               {isPaid ? "Desfazer" : "Confirmar"}
                             </Button>
