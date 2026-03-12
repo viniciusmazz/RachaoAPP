@@ -161,7 +161,7 @@ const Auth = () => {
     } else {
       toast({
         title: "Email enviado!",
-        description: "Verifique sua caixa de entrada para redefinir sua senha."
+        description: "Verifique sua caixa de entrada. Se o link não funcionar, você pode copiar o código de recuperação do link e colar na página de redefinição."
       })
       setIsResettingPassword(false)
     }
