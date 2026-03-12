@@ -28,7 +28,8 @@ export const usePlayers = (groupId?: string) => {
         name: player.name,
         type: player.type as PlayerType,
         photoUrl: player.photo_url,
-        positions: player.positions as PositionSkill[] || []
+        positions: player.positions as PositionSkill[] || [],
+        userId: player.user_id
       }))
 
       setPlayers(mappedPlayers)
@@ -99,7 +100,8 @@ export const usePlayers = (groupId?: string) => {
         name: data.name,
         type: data.type as PlayerType,
         photoUrl: data.photo_url,
-        positions: data.positions as PositionSkill[] || []
+        positions: data.positions as PositionSkill[] || [],
+        userId: data.user_id
       }
 
       setPlayers(prev => [newPlayer, ...prev])
@@ -165,7 +167,8 @@ export const usePlayers = (groupId?: string) => {
           name: player.name,
           type: player.type as PlayerType,
           photoUrl: player.photo_url,
-          positions: player.positions as PositionSkill[] || []
+          positions: player.positions as PositionSkill[] || [],
+          userId: player.user_id
         }))
 
         if (mounted) {
@@ -233,7 +236,8 @@ export const usePlayers = (groupId?: string) => {
         name: player.name,
         type: player.type as PlayerType,
         photoUrl: player.photo_url,
-        positions: player.positions as PositionSkill[] || []
+        positions: player.positions as PositionSkill[] || [],
+        userId: player.user_id
       }))
 
       setPlayers(mappedPlayers)

@@ -50,6 +50,11 @@ const PendingMembers = ({ groupId }: PendingMembersProps) => {
               </Badge>
             </div>
             <p className="text-sm text-slate-500 font-medium">{pendingUser.email}</p>
+            {pendingUser.claimed_player_name && (
+              <p className="text-xs text-primary font-bold mt-1">
+                Solicitou vincular-se a: <span className="underline">{pendingUser.claimed_player_name}</span>
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <DropdownMenu>

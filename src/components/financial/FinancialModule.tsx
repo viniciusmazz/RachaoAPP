@@ -13,6 +13,8 @@ import { useFinancial, type CashEntry } from "@/hooks/useFinancial";
 import type { Player } from "@/types/football";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
+import { PaymentButton } from "./PaymentButton";
 
 interface FinancialModuleProps {
   groupId: string;
@@ -46,6 +48,7 @@ export default function FinancialModule({ groupId, players, isOwner }: Financial
   const [guestFee, setGuestFee] = useState(config?.guestFee?.toString() || "0");
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Cash entry form
   const [entryType, setEntryType] = useState<'income' | 'expense'>('income');
@@ -62,6 +65,10 @@ export default function FinancialModule({ groupId, players, isOwner }: Financial
       setGuestFee(config.guestFee.toString());
     }
   }, [config]);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id || null));
+  }, []);
 
   const mensalistas = players.filter(p => p.type === "mensalista");
   const fee = config?.monthlyFee || 0;
@@ -181,6 +188,8 @@ export default function FinancialModule({ groupId, players, isOwner }: Financial
                   {mensalistas.map(player => {
                     const payment = getPaymentStatus(player.id);
                     const isPaid = payment?.paid || false;
+                    const isCurrentUser = player.user_id === currentUserId;
+                    
                     return (
                       <TableRow key={player.id}>
                         <TableCell className="font-medium">{player.name}</TableCell>
@@ -191,9 +200,22 @@ export default function FinancialModule({ groupId, players, isOwner }: Financial
                               <CheckCircle2 className="h-3 w-3 mr-1" /> Pago
                             </Badge>
                           ) : (
-                            <Badge variant="destructive">
-                              <XCircle className="h-3 w-3 mr-1" /> Pendente
-                            </Badge>
+                            <div className="flex flex-col items-center gap-2">
+                              <Badge variant="destructive">
+                                <XCircle className="h-3 w-3 mr-1" /> Pendente
+                              </Badge>
+                              {!isPaid && isCurrentUser && (
+                                <PaymentButton 
+                                  amount={fee}
+                                  description={`Mensalidade ${MONTH_NAMES[selectedMonth-1]}/${selectedYear}`}
+                                  playerId={player.id}
+                                  groupId={groupId}
+                                  month={selectedMonth}
+                                  year={selectedYear}
+                                  playerName={player.name}
+                                />
+                              )}
+                            </div>
                           )}
                         </TableCell>
                         {isOwner && (

@@ -21,6 +21,7 @@ import FinancialModule from "@/components/financial/FinancialModule";
 import PendingMembers from "@/components/group/PendingMembers";
 import GroupMembers from "@/components/group/GroupMembers";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import JoinGroupDialog from "@/components/group/JoinGroupDialog";
 import { useUserGroups } from "@/hooks/useGroup";
 import type { Teams, Group, MatchEvent } from "@/types/football";
 
@@ -55,9 +56,9 @@ const Index = ({ group, refreshGroup }: IndexProps) => {
   const isPrivate = group.settings.visibility === 'private';
   const hasAccess = !isPrivate || isApproved || isOwner;
 
-  const handleRequestAccess = async () => {
+  const handleRequestAccess = async (playerId?: string) => {
     setRequestingAccess(true);
-    const result = await requestAccess();
+    const result = await requestAccess(playerId);
     if (result.success) {
       toast({
         title: "Solicitação enviada",
@@ -71,6 +72,7 @@ const Index = ({ group, refreshGroup }: IndexProps) => {
       });
     }
     setRequestingAccess(false);
+    return result;
   };
 
   // Navigation helper for protected actions
@@ -281,13 +283,11 @@ const Index = ({ group, refreshGroup }: IndexProps) => {
           </div>
           <div className="flex flex-wrap gap-2">
             {!isApproved && !isPending && user && (
-              <Button 
-                onClick={handleRequestAccess} 
-                disabled={requestingAccess}
-                className="rounded-xl font-bold shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90"
-              >
-                {requestingAccess ? "Solicitando..." : "Solicitar Acesso"}
-              </Button>
+              <JoinGroupDialog 
+                players={players.filter(p => !p.userId)}
+                onRequestAccess={handleRequestAccess}
+                isPending={isPending}
+              />
             )}
             {user && (
               <Button variant="outline" onClick={() => navigate('/')} className="rounded-xl border-slate-200 font-bold hover:bg-slate-100 transition-all">

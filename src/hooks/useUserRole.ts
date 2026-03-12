@@ -29,6 +29,8 @@ interface PendingUser {
   created_at: string
   email: string
   name: string | null
+  claimed_player_id?: string
+  claimed_player_name?: string
 }
 
 export const useUserRole = (groupId?: string) => {
@@ -88,19 +90,25 @@ export const useUserRole = (groupId?: string) => {
           }
         }
 
-        // 4. Fallback to global role
-        const { data, error } = await supabase
-          .from('user_roles')
-          .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle()
+        // 4. Fallback to global role ONLY if not in a group context
+        // If we are in a group context and reached here, the user has NO role in this group
+        if (!groupId) {
+          const { data, error } = await supabase
+            .from('user_roles')
+            .select('*')
+            .eq('user_id', user.id)
+            .maybeSingle()
 
-        if (error) {
-          console.error('Error fetching role:', error)
-          setRole(null)
-        } else if (data) {
-          setRole(data.role as AppRole)
+          if (error) {
+            console.error('Error fetching role:', error)
+            setRole(null)
+          } else if (data) {
+            setRole(data.role as AppRole)
+          } else {
+            setRole(null)
+          }
         } else {
+          // In group context, if no role found yet, they are not a member
           setRole(null)
         }
       } catch (error) {
@@ -130,6 +138,7 @@ export const useUserRole = (groupId?: string) => {
         
         const settings = groupData.settings as unknown as GroupSettings
         const roles = settings?.roles || {}
+        const pendingLinks = settings?.pendingLinks || {}
         const pendingUserIds = Object.keys(roles).filter(id => roles[id] === 'pending')
         
         if (pendingUserIds.length === 0) {
@@ -144,13 +153,28 @@ export const useUserRole = (groupId?: string) => {
 
         if (profilesError) throw profilesError
 
+        // Fetch players to get names for claimed_player_id
+        const claimedPlayerIds = Object.values(pendingLinks).filter(id => !!id) as string[]
+        let playersMap = new Map<string, string>()
+        
+        if (claimedPlayerIds.length > 0) {
+          const { data: playersData } = await supabase
+            .from('players')
+            .select('id, name')
+            .in('id', claimedPlayerIds)
+          
+          playersMap = new Map(playersData?.map(p => [p.id, p.name]) || [])
+        }
+
         const pending: PendingUser[] = profilesData.map(p => ({
           id: p.user_id, // Use user_id as id for group-specific roles
           user_id: p.user_id,
           role: 'pending',
           created_at: new Date().toISOString(), // We don't track this in settings yet
           email: p.email,
-          name: p.name
+          name: p.name,
+          claimed_player_id: pendingLinks[p.user_id],
+          claimed_player_name: pendingLinks[p.user_id] ? playersMap.get(pendingLinks[p.user_id]) : undefined
         }))
 
         setPendingUsers(pending)
@@ -209,9 +233,25 @@ export const useUserRole = (groupId?: string) => {
         const settings = groupData.settings as unknown as GroupSettings
         const roles = { ...(settings?.roles || {}), [userId]: targetRole }
         
+        // Handle pending link if it exists
+        const playerLinks = { ...(settings?.playerLinks || {}) }
+        const pendingLinks = { ...(settings?.pendingLinks || {}) }
+        const playerId = pendingLinks[userId]
+        
+        if (playerId) {
+          playerLinks[userId] = playerId
+          delete pendingLinks[userId]
+          
+          // Also update players table for direct link
+          await supabase
+            .from('players')
+            .update({ user_id: userId })
+            .eq('id', playerId)
+        }
+        
         const { error: updateError } = await supabase
           .from('groups')
-          .update({ settings: { ...settings, roles } })
+          .update({ settings: { ...settings, roles, playerLinks, pendingLinks } })
           .eq('id', groupId)
         
         if (updateError) throw updateError
@@ -360,9 +400,12 @@ export const useUserRole = (groupId?: string) => {
         const roles = { ...(settings?.roles || {}) }
         delete roles[userId]
         
+        const pendingLinks = { ...(settings?.pendingLinks || {}) }
+        delete pendingLinks[userId]
+        
         const { error: updateError } = await supabase
           .from('groups')
-          .update({ settings: { ...settings, roles } })
+          .update({ settings: { ...settings, roles, pendingLinks } })
           .eq('id', groupId)
         
         if (updateError) throw updateError
@@ -383,7 +426,7 @@ export const useUserRole = (groupId?: string) => {
     }
   }
 
-  const requestAccess = async () => {
+  const requestAccess = async (playerId?: string) => {
     if (!user || !groupId) return { success: false }
     try {
       const { data: groupData, error: groupError } = await supabase
@@ -396,10 +439,11 @@ export const useUserRole = (groupId?: string) => {
       
       const settings = groupData.settings as unknown as GroupSettings
       const roles = { ...(settings?.roles || {}), [user.id]: 'pending' }
+      const pendingLinks = { ...(settings?.pendingLinks || {}), [user.id]: playerId }
       
       const { error: updateError } = await supabase
         .from('groups')
-        .update({ settings: { ...settings, roles } })
+        .update({ settings: { ...settings, roles, pendingLinks } })
         .eq('id', groupId)
       
       if (updateError) throw updateError

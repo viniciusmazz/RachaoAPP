@@ -13,6 +13,7 @@ export interface Player {
   type: PlayerType;
   photoUrl?: string;
   positions?: PositionSkill[];
+  userId?: string | null;
 }
 
 export type TeamSide = "azul" | "vermelho";
@@ -65,6 +66,7 @@ export interface GroupSettings {
   enabledStats: StatType[];
   roles?: { [userId: string]: "admin" | "approved" | "pending" | "financeiro" | "atleta" };
   playerLinks?: { [userId: string]: string }; // userId -> playerId
+  pendingLinks?: { [userId: string]: string }; // userId -> playerId
   visibility?: "public" | "private";
 }
 
