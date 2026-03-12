@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import logoUrl from "/logo.png"
 import { supabase } from '@/integrations/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,7 +23,7 @@ const LogoImage = () => {
 
   return (
     <img 
-      src="/logo.png" 
+      src={logoUrl} 
       alt="RachãoApp Logo" 
       className="w-full h-full object-contain"
       onError={() => setError(true)}

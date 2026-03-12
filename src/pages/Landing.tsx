@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import logoUrl from "/logo.png";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
@@ -29,7 +30,7 @@ const LogoImage = ({ size, fallbackText }: { size: string, fallbackText: string 
 
   return (
     <img 
-      src="/logo.png" 
+      src={logoUrl} 
       alt="Logo" 
       className={`${size} object-contain`}
       onError={() => setError(true)}
@@ -71,7 +72,7 @@ const Landing = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    console.log("Landing Page Loaded - Logo Path: /logo.png");
+    console.log("Landing Page Loaded - Logo URL:", logoUrl);
   }, []);
 
   return (
