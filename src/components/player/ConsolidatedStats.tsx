@@ -24,26 +24,37 @@ export default function ConsolidatedStats({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<GroupStats[]>([]);
   const currentYear = new Date().getFullYear();
-  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [selectedYear, setSelectedYear] = useState<number | "total">(currentYear);
 
-  const [availableYears, setAvailableYears] = useState<number[]>([currentYear]);
+  const [availableYears, setAvailableYears] = useState<(number | "total")[]>([currentYear]);
 
   const fetchAllStats = useCallback(async () => {
     try {
       setLoading(true);
       
-      // 1. Fetch all groups where the user is a member or owner
+      // 1. Fetch all groups
       const { data: groupsData, error: groupsError } = await supabase
         .from('groups')
         .select('id, name, settings, owner_id');
       
       if (groupsError) throw groupsError;
 
-      // Filter groups where user has a role or is owner
+      // 2. Fetch all players linked to this user to ensure we find all groups
+      const { data: userPlayers, error: userPlayersError } = await supabase
+        .from('players')
+        .select('id, group_id')
+        .eq('user_id', userId);
+      
+      if (userPlayersError) throw userPlayersError;
+
+      const linkedGroupIds = new Set(userPlayers?.map(p => p.group_id) || []);
+
+      // Filter groups where user has a role, is owner, OR is a linked player
       const userGroups = (groupsData || []).filter(g => {
         const settings = g.settings as { roles?: Record<string, string>; playerLinks?: Record<string, string | string[]> };
         const roles = settings?.roles || {};
-        return roles[userId] || g.owner_id === userId;
+        const playerLinks = settings?.playerLinks || {};
+        return roles[userId] || g.owner_id === userId || linkedGroupIds.has(g.id) || playerLinks[userId];
       });
 
       if (userGroups.length === 0) {
@@ -55,11 +66,10 @@ export default function ConsolidatedStats({ userId }: { userId: string }) {
       const groupIds = Array.from(new Set(userGroups.map(g => g.id)));
       const groupNames = new Map(userGroups.map(g => [g.id, g.name]));
 
-      // 2. Determine the linked player ID for each group
+      // 3. Determine the linked player ID for each group
       const playerIdsByGroup = new Map<string, string[]>();
-      const playerNamesByGroup = new Map<string, string[]>();
 
-      // Fetch all players in these groups to get their names and check user_id
+      // Fetch all players in these groups to check user_id
       const { data: playersInGroups, error: playersError } = await supabase
         .from('players')
         .select('id, name, group_id, user_id')
@@ -67,7 +77,7 @@ export default function ConsolidatedStats({ userId }: { userId: string }) {
 
       if (playersError) throw playersError;
 
-      const playersMap = new Map<string, any[]>();
+      const playersMap = new Map<string, { id: string; name: string; group_id: string; user_id: string | null }[]>();
       playersInGroups?.forEach(p => {
         const groupPlayers = playersMap.get(p.group_id) || [];
         groupPlayers.push(p);
@@ -84,14 +94,12 @@ export default function ConsolidatedStats({ userId }: { userId: string }) {
         const groupPlayers = playersMap.get(group.id) || [];
 
         if (linkedIdFromSettings) {
-          // If settings has a link, it's the source of truth (Master Link)
           if (Array.isArray(linkedIdFromSettings)) {
             finalPlayerIds = linkedIdFromSettings;
           } else if (typeof linkedIdFromSettings === 'string') {
             finalPlayerIds = [linkedIdFromSettings];
           }
         } else {
-          // Fallback to players table user_id
           finalPlayerIds = groupPlayers
             .filter(p => p.user_id === userId)
             .map(p => p.id);
@@ -99,14 +107,10 @@ export default function ConsolidatedStats({ userId }: { userId: string }) {
 
         if (finalPlayerIds.length > 0) {
           playerIdsByGroup.set(group.id, finalPlayerIds);
-          const names = groupPlayers
-            .filter(p => finalPlayerIds.includes(p.id))
-            .map(p => p.name);
-          playerNamesByGroup.set(group.id, names);
         }
       });
 
-      // 3. Fetch matches for all these groups
+      // 4. Fetch matches for all these groups
       const { data: matchesData, error: matchesError } = await supabase
         .from('matches')
         .select('*')
@@ -114,19 +118,26 @@ export default function ConsolidatedStats({ userId }: { userId: string }) {
       
       if (matchesError) throw matchesError;
 
-      // Update available years based on all matches found
+      // Update available years
       const years = new Set<number>();
       years.add(currentYear);
       matchesData?.forEach(m => {
         years.add(new Date(m.date).getFullYear());
       });
-      setAvailableYears(Array.from(years).sort((a, b) => b - a));
+      const sortedYears: (number | "total")[] = Array.from(years).sort((a, b) => b - a);
+      sortedYears.push("total");
+      setAvailableYears(sortedYears);
 
-      // 4. Calculate stats per group
+      // 5. Calculate stats per group
       const consolidated: GroupStats[] = Array.from(playerIdsByGroup.entries()).map(([groupId, playerIds]) => {
-        // Filter matches by group AND year
+        // Filter matches by group AND year (if not total)
         const groupMatches = (matchesData || [])
-          .filter(m => m.group_id === groupId && new Date(m.date).getFullYear() === selectedYear) as unknown as Match[];
+          .filter(m => {
+            const isSameGroup = m.group_id === groupId;
+            if (!isSameGroup) return false;
+            if (selectedYear === "total") return true;
+            return new Date(m.date).getFullYear() === selectedYear;
+          }) as unknown as Match[];
         
         let jogos = 0, vitorias = 0, empates = 0, derrotas = 0, gols = 0, assistencias = 0;
         const processedMatchIds = new Set<string>();
@@ -135,17 +146,19 @@ export default function ConsolidatedStats({ userId }: { userId: string }) {
           if (processedMatchIds.has(match.id)) return;
           processedMatchIds.add(match.id);
 
-          const azulGoals = match.events.filter(e => e.team === "azul").length;
-          const vermelhoGoals = match.events.filter(e => e.team === "vermelho").length;
+          // Calculate score from teams data (Manual Entry)
+          const azulGoals = (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+                           (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+          const vermelhoGoals = (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+                               (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
-          // Find all instances of the user's linked players in this match
-          const playerInAzul = match.teams.azul.filter(t => playerIds.includes(t.playerId));
-          const playerInVermelho = match.teams.vermelho.filter(t => playerIds.includes(t.playerId));
+          const playerInAzul = (match.teams.azul || []).filter(t => playerIds.includes(t.playerId));
+          const playerInVermelho = (match.teams.vermelho || []).filter(t => playerIds.includes(t.playerId));
 
           if (playerInAzul.length > 0 || playerInVermelho.length > 0) {
             jogos++;
             
-            // Sum goals and assists from ALL matching entries for this user in this match
+            // Sum goals and assists from teams data
             playerInAzul.forEach(p => {
               gols += p.goals || 0;
               assistencias += p.assists || 0;
@@ -155,7 +168,6 @@ export default function ConsolidatedStats({ userId }: { userId: string }) {
               assistencias += p.assists || 0;
             });
 
-            // Determine result
             const wonAzul = azulGoals > vermelhoGoals;
             const wonVermelho = vermelhoGoals > azulGoals;
             const isDraw = azulGoals === vermelhoGoals;
@@ -182,7 +194,7 @@ export default function ConsolidatedStats({ userId }: { userId: string }) {
           gols,
           assistencias,
           aproveitamento,
-          playerNames: playerNamesByGroup.get(groupId) || []
+          playerNames: [] // Removed as per user request
         };
       });
 
@@ -237,11 +249,11 @@ export default function ConsolidatedStats({ userId }: { userId: string }) {
             <Calendar className="h-4 w-4 text-slate-400 mr-3" />
             <select 
               value={selectedYear} 
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              onChange={(e) => setSelectedYear(e.target.value === "total" ? "total" : Number(e.target.value))}
               className="bg-transparent text-sm font-bold text-slate-900 outline-none cursor-pointer pr-2"
             >
               {availableYears.map(year => (
-                <option key={year} value={year}>{year}</option>
+                <option key={year} value={year}>{year === "total" ? "Total" : year}</option>
               ))}
             </select>
           </div>
@@ -263,9 +275,9 @@ export default function ConsolidatedStats({ userId }: { userId: string }) {
             <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
               <Trophy className="h-10 w-10 text-slate-200" />
             </div>
-            <h3 className="text-xl font-bold text-slate-900">Nenhum dado em {selectedYear}</h3>
+            <h3 className="text-xl font-bold text-slate-900">Nenhum dado encontrado</h3>
             <p className="text-slate-500 mt-2 max-w-xs mx-auto">
-              Você ainda não disputou partidas nos grupos vinculados durante este ano.
+              Você ainda não disputou partidas nos grupos vinculados durante o período selecionado.
             </p>
           </CardContent>
         </Card>
@@ -357,6 +369,7 @@ export default function ConsolidatedStats({ userId }: { userId: string }) {
                     <TableHead className="text-center font-black text-slate-900 uppercase text-[10px] tracking-widest">Jogos</TableHead>
                     <TableHead className="text-center font-black text-slate-900 uppercase text-[10px] tracking-widest">Gols</TableHead>
                     <TableHead className="text-center font-black text-slate-900 uppercase text-[10px] tracking-widest">Assists</TableHead>
+                    <TableHead className="text-center font-black text-slate-900 uppercase text-[10px] tracking-widest">Partic.</TableHead>
                     <TableHead className="text-center font-black text-slate-900 uppercase text-[10px] tracking-widest">V/E/D</TableHead>
                     <TableHead className="px-8 text-right font-black text-slate-900 uppercase text-[10px] tracking-widest">Aprov.</TableHead>
                   </TableRow>
@@ -366,16 +379,11 @@ export default function ConsolidatedStats({ userId }: { userId: string }) {
                     <TableRow key={s.groupId} className="border-slate-50 hover:bg-slate-50/50 transition-colors">
                       <TableCell className="px-8 py-4">
                         <div className="font-bold text-slate-900">{s.groupName}</div>
-                        <div className="text-[10px] text-primary font-black uppercase tracking-tight">
-                          {s.playerNames.join(', ')}
-                        </div>
-                        <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">
-                          ID: {s.groupId.substring(0, 8)}
-                        </div>
                       </TableCell>
                       <TableCell className="text-center font-bold text-slate-600">{s.jogos}</TableCell>
                       <TableCell className="text-center font-black text-emerald-600">{s.gols}</TableCell>
                       <TableCell className="text-center font-black text-blue-600">{s.assistencias}</TableCell>
+                      <TableCell className="text-center font-black text-slate-900">{s.gols + s.assistencias}</TableCell>
                       <TableCell className="text-center font-bold text-slate-400 text-[10px]">
                         {s.vitorias}V / {s.empates}E / {s.derrotas}D
                       </TableCell>

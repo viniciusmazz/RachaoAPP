@@ -16,7 +16,22 @@ const Auth = () => {
   const [cpf, setCpf] = useState('')
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
+  const [isResettingPassword, setIsResettingPassword] = useState(false)
+  const [isRecovering, setIsRecovering] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecovering(true)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
 
   useEffect(() => {
     // Check if user is already logged in
@@ -96,6 +111,59 @@ const Auth = () => {
     setLoading(false)
   }
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email) {
+      toast({
+        title: "Email necessário",
+        description: "Por favor, insira seu email para receber o link de redefinição.",
+        variant: "destructive"
+      })
+      return
+    }
+    setLoading(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth`,
+    })
+    if (error) {
+      toast({
+        title: "Erro ao enviar email",
+        description: error.message,
+        variant: "destructive"
+      })
+    } else {
+      toast({
+        title: "Email enviado!",
+        description: "Verifique sua caixa de entrada para redefinir sua senha."
+      })
+      setIsResettingPassword(false)
+    }
+    setLoading(false)
+  }
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) {
+      toast({
+        title: "Erro ao atualizar senha",
+        description: error.message,
+        variant: "destructive"
+      })
+    } else {
+      toast({
+        title: "Senha atualizada!",
+        description: "Sua senha foi alterada com sucesso. Você já pode fazer login."
+      })
+      setIsRecovering(false)
+      setIsResettingPassword(false)
+      // Sign out to force fresh login if needed, or just navigate
+      await supabase.auth.signOut()
+    }
+    setLoading(false)
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 relative overflow-hidden">
       {/* Decorative background elements */}
@@ -106,17 +174,7 @@ const Auth = () => {
         <div className="h-2 w-full bg-primary" />
         <CardHeader className="text-center pt-10 pb-6">
           <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl border border-slate-100 overflow-hidden">
-            <img src="/logo.png" alt="RachãoApp Logo" className="w-full h-full object-contain" onError={(e) => {
-              const target = e.currentTarget;
-              console.error("Auth logo failed to load at path:", target.src);
-              // Try relative path as fallback
-              if (target.src.startsWith(window.location.origin + "/logo.png")) {
-                target.src = "logo.png";
-              } else {
-                target.style.display = 'none';
-                target.parentElement!.innerHTML = '<div class="w-full h-full bg-primary flex items-center justify-center"><span class="text-white font-black text-3xl">R</span></div>';
-              }
-            }} />
+            <img src={`/logo.png?t=${Date.now()}`} alt="RachãoApp Logo" className="w-full h-full object-contain" />
           </div>
           <CardTitle className="text-3xl font-black tracking-tight text-slate-900">RachãoApp</CardTitle>
           <CardDescription className="text-slate-500 font-medium mt-2">
@@ -124,43 +182,108 @@ const Auth = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="px-8 pb-10">
-          <Tabs defaultValue="signin" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-8 p-1 bg-slate-100 rounded-2xl h-12">
-              <TabsTrigger value="signin" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Entrar</TabsTrigger>
-              <TabsTrigger value="signup" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Cadastrar</TabsTrigger>
-            </TabsList>
+          {isRecovering ? (
+            <form onSubmit={handleUpdatePassword} className="space-y-5">
+              <div className="text-center mb-6">
+                <h3 className="text-lg font-bold text-slate-900">Definir Nova Senha</h3>
+                <p className="text-sm text-slate-500">Crie uma nova senha para sua conta.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-password" className="text-xs font-bold uppercase tracking-widest text-slate-400 ml-1">Nova Senha</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  placeholder="Mínimo 6 caracteres"
+                  className="h-12 rounded-2xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </div>
+              <Button type="submit" className="w-full h-14 rounded-2xl text-base font-bold shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all mt-4" disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                Atualizar Senha
+              </Button>
+            </form>
+          ) : (
+            <Tabs defaultValue="signin" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-8 p-1 bg-slate-100 rounded-2xl h-12">
+                <TabsTrigger value="signin" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Entrar</TabsTrigger>
+                <TabsTrigger value="signup" className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm font-bold">Cadastrar</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="signin" className="mt-0">
-              <form onSubmit={handleSignIn} className="space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="signin-email" className="text-xs font-bold uppercase tracking-widest text-slate-400 ml-1">Email</Label>
-                  <Input
-                    id="signin-email"
-                    type="email"
-                    placeholder="seu@email.com"
-                    className="h-12 rounded-2xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signin-password" className="text-xs font-bold uppercase tracking-widest text-slate-400 ml-1">Senha</Label>
-                  <Input
-                    id="signin-password"
-                    type="password"
-                    placeholder="••••••••"
-                    className="h-12 rounded-2xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full h-14 rounded-2xl text-base font-bold shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all mt-4" disabled={loading}>
-                  {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                  Entrar na Conta
-                </Button>
-              </form>
+              <TabsContent value="signin" className="mt-0">
+              {isResettingPassword ? (
+                <form onSubmit={handleResetPassword} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-email" className="text-xs font-bold uppercase tracking-widest text-slate-400 ml-1">Email para Recuperação</Label>
+                    <Input
+                      id="reset-email"
+                      type="email"
+                      placeholder="seu@email.com"
+                      className="h-12 rounded-2xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    <Button type="submit" className="w-full h-14 rounded-2xl text-base font-bold shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all" disabled={loading}>
+                      {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                      Enviar Link de Recuperação
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      className="text-slate-500 font-bold" 
+                      onClick={() => setIsResettingPassword(false)}
+                    >
+                      Voltar para o Login
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleSignIn} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-email" className="text-xs font-bold uppercase tracking-widest text-slate-400 ml-1">Email</Label>
+                    <Input
+                      id="signin-email"
+                      type="email"
+                      placeholder="seu@email.com"
+                      className="h-12 rounded-2xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <Label htmlFor="signin-password" className="text-xs font-bold uppercase tracking-widest text-slate-400 ml-1">Senha</Label>
+                      <button 
+                        type="button" 
+                        onClick={() => setIsResettingPassword(true)}
+                        className="text-xs font-bold text-primary hover:underline"
+                      >
+                        Esqueceu a senha?
+                      </button>
+                    </div>
+                    <Input
+                      id="signin-password"
+                      type="password"
+                      placeholder="••••••••"
+                      className="h-12 rounded-2xl border-slate-200 bg-slate-50/50 focus:bg-white transition-all"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full h-14 rounded-2xl text-base font-bold shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all mt-4" disabled={loading}>
+                    {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                    Entrar na Conta
+                  </Button>
+                </form>
+              )}
             </TabsContent>
 
             <TabsContent value="signup" className="mt-0">
@@ -232,6 +355,7 @@ const Auth = () => {
               </form>
             </TabsContent>
           </Tabs>
+          )}
         </CardContent>
       </Card>
     </div>

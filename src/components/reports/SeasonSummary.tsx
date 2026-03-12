@@ -32,9 +32,6 @@ interface TeamColorStats {
 export default function SeasonSummary({ matches, players, selectedYear, group }: SeasonSummaryProps) {
   const homeConfig = group.settings.sides.home;
   const awayConfig = group.settings.sides.away;
-  const nameById = (id: string) => players.find((p) => p.id === id)?.name ?? "—";
-  const isMensalista = (id: string) => players.find((p) => p.id === id)?.type === "mensalista";
-
   // Team color stats
   const teamStats = useMemo((): Record<TeamSide, TeamColorStats> => {
     const stats: Record<TeamSide, TeamColorStats> = {
@@ -43,8 +40,11 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
     };
 
     matches.forEach(match => {
-      const golsAzul = match.events.filter(e => e.team === "azul").length;
-      const golsVermelho = match.events.filter(e => e.team === "vermelho").length;
+      // Calculate score from teams data (Manual Entry)
+      const golsAzul = (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+                       (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+      const golsVermelho = (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+                           (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
       stats.azul.jogos++;
       stats.azul.golsPro += golsAzul;
@@ -77,6 +77,9 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
   }, [matches]);
 
   const summaryItems = useMemo((): SummaryItem[] => {
+    const nameById = (id: string) => players.find((p) => p.id === id)?.name ?? "—";
+    const isMensalista = (id: string) => players.find((p) => p.id === id)?.type === "mensalista";
+
     if (matches.length === 0) return [];
 
     // Build stats per player
@@ -96,8 +99,11 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
     };
 
     matches.forEach(match => {
-      const golsAzul = match.events.filter(e => e.team === "azul").length;
-      const golsVermelho = match.events.filter(e => e.team === "vermelho").length;
+      // Calculate score from teams data (Manual Entry)
+      const golsAzul = (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+                       (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+      const golsVermelho = (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+                           (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
       let azulResult: "v" | "e" | "d" = "e";
       let vermelhoResult: "v" | "e" | "d" = "e";
@@ -126,21 +132,23 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
       processTeam(match.teams.azul, azulResult, golsVermelho);
       processTeam(match.teams.vermelho, vermelhoResult, golsAzul);
 
-      const countFromTeam = (team: typeof match.teams.azul) => {
-        team.forEach(t => {
-          if (!isMensalista(t.playerId)) return;
-          const s = ensure(t.playerId);
-          const goals = t.goals || 0;
-          const assists = t.assists || 0;
-          const ownGoals = t.ownGoals || 0;
-          s.gols += goals;
-          s.assistencias += assists;
-          s.ownGoals += ownGoals;
-          s.participacoes += goals + assists;
-        });
-      };
-      countFromTeam(match.teams.azul);
-      countFromTeam(match.teams.vermelho);
+      // Count goals and assists from teams (Manual Entry)
+      match.teams.azul.forEach(p => {
+        if (!isMensalista(p.playerId)) return;
+        const s = ensure(p.playerId);
+        s.gols += p.goals || 0;
+        s.assistencias += p.assists || 0;
+        s.ownGoals += p.ownGoals || 0;
+        s.participacoes += (p.goals || 0) + (p.assists || 0);
+      });
+      match.teams.vermelho.forEach(p => {
+        if (!isMensalista(p.playerId)) return;
+        const s = ensure(p.playerId);
+        s.gols += p.goals || 0;
+        s.assistencias += p.assists || 0;
+        s.ownGoals += p.ownGoals || 0;
+        s.participacoes += (p.goals || 0) + (p.assists || 0);
+      });
     });
 
     const entries = Array.from(stats.entries()).filter(([, s]) => s.jogos > 0);
@@ -210,7 +218,7 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
     }
 
     return items;
-  }, [matches, isMensalista, nameById]);
+  }, [matches, players]);
 
   if (summaryItems.length === 0 && matches.length === 0) {
     return null;
