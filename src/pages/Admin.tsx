@@ -177,21 +177,33 @@ const Admin = () => {
   };
 
   const saveAppLogo = async () => {
-    if (!user) return;
-    console.log('Saving app logo to groups table. Length:', appLogo?.length || 0);
+    if (!user) {
+      console.error('SaveAppLogo: No user logged in');
+      return;
+    }
+    console.log('SaveAppLogo: Starting save process. Logo length:', appLogo?.length || 0);
     setSavingLogo(true);
     try {
       // First, try to find if the settings group exists
-      const { data: existingGroup } = await supabase
+      console.log('SaveAppLogo: Checking for existing app-settings group...');
+      const { data: existingGroup, error: fetchError } = await supabase
         .from('groups')
-        .select('id, settings')
+        .select('id, settings, owner_id')
         .eq('slug', 'app-settings')
         .maybeSingle();
 
+      if (fetchError) {
+        console.error('SaveAppLogo: Error fetching existing group:', fetchError);
+        throw fetchError;
+      }
+
+      console.log('SaveAppLogo: Existing group data:', existingGroup);
+
       if (existingGroup) {
         // Update existing
+        console.log('SaveAppLogo: Updating existing group ID:', existingGroup.id);
         const settings = (existingGroup.settings as Record<string, unknown>) || {};
-        const { error } = await supabase
+        const { error: updateError } = await supabase
           .from('groups')
           .update({ 
             settings: { 
@@ -201,10 +213,15 @@ const Admin = () => {
           })
           .eq('id', existingGroup.id);
         
-        if (error) throw error;
+        if (updateError) {
+          console.error('SaveAppLogo: Update error:', updateError);
+          throw updateError;
+        }
+        console.log('SaveAppLogo: Update successful');
       } else {
         // Create new system group for settings
-        const { error } = await supabase
+        console.log('SaveAppLogo: Creating new app-settings group...');
+        const { error: insertError } = await supabase
           .from('groups')
           .insert({
             slug: 'app-settings',
@@ -213,7 +230,11 @@ const Admin = () => {
             settings: { appLogo: appLogo }
           });
         
-        if (error) throw error;
+        if (insertError) {
+          console.error('SaveAppLogo: Insert error:', insertError);
+          throw insertError;
+        }
+        console.log('SaveAppLogo: Insert successful');
       }
 
       toast({
@@ -223,11 +244,12 @@ const Admin = () => {
       
       // Force a small delay then reload to ensure all components see the change
       setTimeout(() => {
+        console.log('SaveAppLogo: Reloading page...');
         window.location.reload();
-      }, 1000);
+      }, 1500);
     } catch (error: unknown) {
       const err = error as Error;
-      console.error('Error saving app logo:', err);
+      console.error('SaveAppLogo: Unexpected error:', err);
       toast({
         title: "Erro ao salvar logo",
         description: err.message || "Não foi possível salvar o logo. Tente novamente.",
@@ -423,6 +445,29 @@ const Admin = () => {
                       disabled={savingLogo}
                     >
                       {savingLogo ? "Salvando..." : "Salvar Alterações"}
+                    </Button>
+                  </div>
+                  <div className="pt-4 border-t border-slate-200 mt-4">
+                    <p className="text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-2">Debug Info</p>
+                    <div className="grid grid-cols-2 gap-2 text-[10px] font-mono bg-slate-100 p-2 rounded">
+                      <span className="text-slate-500">Logo no Banco:</span>
+                      <span className={currentLogo ? "text-emerald-600" : "text-amber-600"}>
+                        {currentLogo ? `Sim (${Math.round(currentLogo.length / 1024)}KB)` : "Não"}
+                      </span>
+                      <span className="text-slate-500">Logo Local:</span>
+                      <span className={appLogo ? "text-emerald-600" : "text-amber-600"}>
+                        {appLogo ? `Sim (${Math.round(appLogo.length / 1024)}KB)` : "Não"}
+                      </span>
+                      <span className="text-slate-500">Status:</span>
+                      <span>{settingsLoading ? "Carregando..." : "Pronto"}</span>
+                    </div>
+                    <Button 
+                      variant="link" 
+                      size="sm" 
+                      className="h-auto p-0 text-[10px] mt-2"
+                      onClick={() => console.log('Current Logo Data:', currentLogo)}
+                    >
+                      Logar dados do logo no console
                     </Button>
                   </div>
                 </div>

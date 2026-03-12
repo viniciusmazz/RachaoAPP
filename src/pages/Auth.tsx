@@ -29,6 +29,7 @@ const LogoImage = () => {
       alt="RachãoApp Logo" 
       className="w-full h-full object-contain"
       onError={() => setError(true)}
+      referrerPolicy="no-referrer"
     />
   );
 };

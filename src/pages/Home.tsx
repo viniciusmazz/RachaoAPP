@@ -33,6 +33,7 @@ const LogoImage = ({ size, fallbackText }: { size: string, fallbackText: string 
       alt="Logo" 
       className={`${size} object-contain`}
       onError={() => setError(true)}
+      referrerPolicy="no-referrer"
     />
   );
 };
