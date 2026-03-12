@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole, AppRole } from "@/hooks/useUserRole";
+import { useAppSettings } from "@/hooks/useAppSettings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -140,11 +141,14 @@ const Admin = () => {
         return;
       }
       
-      if (data && data.settings && (data.settings as any).appLogo) {
-        console.log('App logo found in database');
-        setAppLogo((data.settings as any).appLogo);
-      } else {
-        console.log('App logo not found in database');
+      if (data && data.settings && typeof data.settings === 'object') {
+        const settings = data.settings as Record<string, unknown>;
+        if (settings.appLogo && typeof settings.appLogo === 'string') {
+          console.log('App logo found in database');
+          setAppLogo(settings.appLogo);
+        } else {
+          console.log('App logo not found in database');
+        }
       }
     } catch (error) {
       console.error('Unexpected error fetching app settings:', error);
@@ -186,11 +190,12 @@ const Admin = () => {
 
       if (existingGroup) {
         // Update existing
+        const settings = (existingGroup.settings as Record<string, unknown>) || {};
         const { error } = await supabase
           .from('groups')
           .update({ 
             settings: { 
-              ...(existingGroup.settings as any), 
+              ...settings, 
               appLogo: appLogo 
             } 
           })
@@ -220,11 +225,12 @@ const Admin = () => {
       setTimeout(() => {
         window.location.reload();
       }, 1000);
-    } catch (error: any) {
-      console.error('Error saving app logo:', error);
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error('Error saving app logo:', err);
       toast({
         title: "Erro ao salvar logo",
-        description: error.message || "Não foi possível salvar o logo. Tente novamente.",
+        description: err.message || "Não foi possível salvar o logo. Tente novamente.",
         variant: "destructive"
       });
     } finally {
