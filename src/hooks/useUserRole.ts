@@ -411,13 +411,18 @@ export const useUserRole = (groupId?: string) => {
     }
   }
 
-  const isSuperAdmin = user?.email?.toLowerCase() === 'viniciusmazz@gmail.com'
+  const isSuperAdmin = user?.email ? user.email.toLowerCase().trim() === 'viniciusmazz@gmail.com' : false;
   
   useEffect(() => {
     if (user) {
-      console.log('Auth Check - Email:', user.email, 'Target:', 'viniciusmazz@gmail.com', 'Match:', user.email?.toLowerCase() === 'viniciusmazz@gmail.com');
+      console.log('SuperAdmin Check:', {
+        email: user.email,
+        normalized: user.email?.toLowerCase().trim(),
+        target: 'viniciusmazz@gmail.com',
+        match: isSuperAdmin
+      });
     }
-  }, [user]);
+  }, [user, isSuperAdmin]);
   const isAdmin = role === 'admin' || isSuperAdmin
   const isFinanceiro = role === 'financeiro' || role === 'admin' || isSuperAdmin
   const isApproved = role === 'approved' || role === 'atleta' || role === 'financeiro' || role === 'admin' || isSuperAdmin

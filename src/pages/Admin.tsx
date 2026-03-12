@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { ArrowLeft, Check, X, Users, Clock, Shield, UserCheck } from "lucide-react";
+import { ArrowLeft, Check, X, Users, Clock, Shield, UserCheck, Settings, Upload, Trash2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -41,23 +41,35 @@ const Admin = () => {
 
   const [allUsers, setAllUsers] = useState<AllUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [appLogo, setAppLogo] = useState<string | null>(null);
+  const [savingLogo, setSavingLogo] = useState(false);
 
   console.log('Admin Page - User:', user?.email, 'isSuperAdmin:', isSuperAdmin, 'role:', role);
 
+  const isSuperAdminCheck = user?.email?.toLowerCase().trim() === 'viniciusmazz@gmail.com';
+
   useEffect(() => {
     if (!authLoading && !roleLoading) {
+      console.log('Admin Access Check:', {
+        userEmail: user?.email,
+        isSuperAdminFromHook: isSuperAdmin,
+        isSuperAdminFromLocal: isSuperAdminCheck,
+        roleLoading,
+        authLoading
+      });
+
       if (!user) {
         navigate('/auth');
-      } else if (!isSuperAdmin) {
+      } else if (!isSuperAdmin && !isSuperAdminCheck) {
         navigate('/');
         toast({
           title: "Acesso negado",
-          description: "Apenas o administrador geral pode acessar esta página",
+          description: `Apenas o administrador geral pode acessar esta página. Logado como: ${user.email}`,
           variant: "destructive"
         });
       }
     }
-  }, [user, authLoading, roleLoading, isSuperAdmin, navigate]);
+  }, [user, authLoading, roleLoading, isSuperAdmin, isSuperAdminCheck, navigate]);
 
   const fetchAllUsers = useCallback(async () => {
     setLoadingUsers(true);
@@ -107,12 +119,106 @@ const Admin = () => {
     }
   }, []);
 
-  useEffect(() => {
-    if (isSuperAdmin) {
-      fetchPendingUsers();
-      fetchAllUsers();
+  const fetchAppSettings = useCallback(async () => {
+    try {
+      console.log('Fetching app settings from groups table...');
+      const { data, error } = await supabase
+        .from('groups')
+        .select('settings')
+        .eq('slug', 'app-settings')
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error fetching app settings:', error);
+        return;
+      }
+      
+      if (data && data.settings && (data.settings as any).appLogo) {
+        console.log('App logo found in database');
+        setAppLogo((data.settings as any).appLogo);
+      } else {
+        console.log('App logo not found in database');
+      }
+    } catch (error) {
+      console.error('Unexpected error fetching app settings:', error);
     }
-  }, [isSuperAdmin, fetchPendingUsers, fetchAllUsers]);
+  }, []);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "Arquivo muito grande",
+        description: "O logo deve ter no máximo 2MB",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64String = reader.result as string;
+      setAppLogo(base64String);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const saveAppLogo = async () => {
+    if (!user) return;
+    console.log('Saving app logo to groups table. Length:', appLogo?.length || 0);
+    setSavingLogo(true);
+    try {
+      // First, try to find if the settings group exists
+      const { data: existingGroup } = await supabase
+        .from('groups')
+        .select('id, settings')
+        .eq('slug', 'app-settings')
+        .maybeSingle();
+
+      if (existingGroup) {
+        // Update existing
+        const { error } = await supabase
+          .from('groups')
+          .update({ 
+            settings: { 
+              ...(existingGroup.settings as any), 
+              appLogo: appLogo 
+            } 
+          })
+          .eq('id', existingGroup.id);
+        
+        if (error) throw error;
+      } else {
+        // Create new system group for settings
+        const { error } = await supabase
+          .from('groups')
+          .insert({
+            slug: 'app-settings',
+            name: 'Configurações do Sistema',
+            owner_id: user.id,
+            settings: { appLogo: appLogo }
+          });
+        
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Configurações salvas",
+        description: "O logo do aplicativo foi atualizado com sucesso no banco de dados."
+      });
+    } catch (error: any) {
+      console.error('Error saving app logo:', error);
+      toast({
+        title: "Erro ao salvar logo",
+        description: error.message || "Não foi possível salvar o logo. Tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setSavingLogo(false);
+    }
+  };
 
   const handleApprove = async (userRoleId: string, email: string, newRole: AppRole = 'approved') => {
     try {
@@ -235,7 +341,78 @@ const Admin = () => {
         <p className="text-muted-foreground mt-2">Gerencie aprovações e níveis de acesso dos usuários</p>
       </header>
 
-      <main className="space-y-6">
+      <main className="space-y-6 pb-20">
+        {/* Global Settings Card */}
+        <Card className="border-primary/20 shadow-lg shadow-primary/5">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Settings className="h-5 w-5 text-primary" />
+              <CardTitle>Configurações do Aplicativo</CardTitle>
+            </div>
+            <CardDescription>
+              Personalize a aparência global do RachãoApp
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
+              <label className="text-sm font-bold text-slate-700">Logo do Aplicativo (Landing e Login)</label>
+              <div className="flex flex-col md:flex-row items-center gap-6 p-6 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <div className="w-32 h-32 bg-white rounded-2xl shadow-inner border flex items-center justify-center overflow-hidden shrink-0">
+                  {appLogo ? (
+                    <img src={appLogo} alt="App Logo Preview" className="w-full h-full object-contain p-2" />
+                  ) : (
+                    <div className="text-slate-300 text-xs text-center p-2">Sem logo personalizado</div>
+                  )}
+                </div>
+                <div className="flex-1 space-y-3 w-full">
+                  <p className="text-xs text-slate-500">
+                    Este logo aparecerá na página inicial e na tela de login. 
+                    Recomendamos uma imagem PNG transparente de pelo menos 512x512px.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="relative overflow-hidden"
+                      asChild
+                    >
+                      <label className="cursor-pointer flex items-center gap-2">
+                        <Upload className="h-4 w-4" />
+                        Selecionar Imagem
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept="image/*" 
+                          onChange={handleLogoUpload} 
+                        />
+                      </label>
+                    </Button>
+                    {appLogo && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-destructive hover:bg-destructive/10"
+                        onClick={() => setAppLogo(null)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Remover
+                      </Button>
+                    )}
+                    <Button 
+                      size="sm" 
+                      className="ml-auto"
+                      onClick={saveAppLogo}
+                      disabled={savingLogo}
+                    >
+                      {savingLogo ? "Salvando..." : "Salvar Alterações"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Pending Users Card */}
         <Card>
           <CardHeader>

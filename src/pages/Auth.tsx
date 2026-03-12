@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import logoUrl from "/logo.png"
+import { useAppSettings } from "@/hooks/useAppSettings"
 import { supabase } from '@/integrations/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +13,7 @@ import { Loader2 } from 'lucide-react'
 
 const LogoImage = () => {
   const [error, setError] = useState(false);
+  const { appLogo } = useAppSettings();
   
   if (error) {
     return (
@@ -23,7 +25,7 @@ const LogoImage = () => {
 
   return (
     <img 
-      src={logoUrl} 
+      src={appLogo || logoUrl} 
       alt="RachãoApp Logo" 
       className="w-full h-full object-contain"
       onError={() => setError(true)}

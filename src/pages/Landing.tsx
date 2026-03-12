@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logoUrl from "/logo.png";
+import { useAppSettings } from "@/hooks/useAppSettings";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
@@ -19,6 +20,7 @@ const FEATURES = [
 
 const LogoImage = ({ size, fallbackText }: { size: string, fallbackText: string }) => {
   const [error, setError] = useState(false);
+  const { appLogo } = useAppSettings();
   
   if (error) {
     return (
@@ -30,7 +32,7 @@ const LogoImage = ({ size, fallbackText }: { size: string, fallbackText: string 
 
   return (
     <img 
-      src={logoUrl} 
+      src={appLogo || logoUrl} 
       alt="Logo" 
       className={`${size} object-contain`}
       onError={() => setError(true)}
