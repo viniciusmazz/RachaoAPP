@@ -59,13 +59,22 @@ const Landing = () => {
       <nav className="border-b bg-white/80 backdrop-blur-xl sticky top-0 z-50">
         <div className="container flex items-center justify-between h-20 max-w-6xl">
           <div className="flex items-center gap-3 group cursor-pointer" onClick={() => navigate("/")}>
-            <div className="w-12 h-12 bg-white rounded-xl shadow-md border border-slate-100 flex items-center justify-center overflow-hidden">
+            <div className="w-12 h-12 bg-primary/5 rounded-xl shadow-md border border-slate-100 flex items-center justify-center overflow-hidden">
               <img 
-                src={`/logo.png?t=${Date.now()}`} 
+                src="/logo.png" 
                 alt="Logo" 
                 className="w-full h-full object-contain" 
                 onError={(e) => {
                   console.error("Erro ao carregar logo.png");
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const parent = target.parentElement;
+                  if (parent) {
+                    const fallback = document.createElement('div');
+                    fallback.className = "w-full h-full flex items-center justify-center text-primary font-black text-xl";
+                    fallback.innerText = "R";
+                    parent.appendChild(fallback);
+                  }
                 }} 
               />
             </div>
@@ -183,8 +192,16 @@ const Landing = () => {
       <footer className="border-t py-12 bg-slate-50">
         <div className="container max-w-6xl flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-white rounded-lg shadow-sm border border-slate-100 flex items-center justify-center overflow-hidden">
-              <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
+            <div className="w-8 h-8 bg-primary/5 rounded-lg shadow-sm border border-slate-100 flex items-center justify-center overflow-hidden">
+              <img 
+                src="/logo.png" 
+                alt="Logo" 
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                }}
+              />
             </div>
             <span className="font-black text-lg tracking-tighter">Rachão<span className="text-primary">App</span></span>
           </div>
