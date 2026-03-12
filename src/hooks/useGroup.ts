@@ -25,6 +25,11 @@ const mapGroup = (row: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const dbSettings = (row.settings as any) || {};
   
+  console.log(`Mapping group ${row.name}. DB Logo present:`, !!dbSettings.logoUrl);
+  if (dbSettings.logoUrl) {
+    console.log(`Logo length: ${dbSettings.logoUrl.length}`);
+  }
+
   // Deep merge sides to avoid losing data
   const settings: GroupSettings = {
     ...DEFAULT_SETTINGS,
@@ -217,7 +222,10 @@ export const useUserGroups = () => {
       const updateData: Partial<{ name: string; slug: string; settings: GroupSettings }> = {}
       if (updates.name) updateData.name = updates.name
       if (updates.slug) updateData.slug = updates.slug.toLowerCase()
-      if (updates.settings) updateData.settings = updates.settings
+      if (updates.settings) {
+        updateData.settings = updates.settings
+        console.log('Updating settings. Logo present:', !!updates.settings.logoUrl);
+      }
 
       const { error } = await supabase
         .from('groups')

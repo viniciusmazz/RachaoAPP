@@ -51,9 +51,17 @@ const GroupSettingsComponent = ({ group, onSave }: GroupSettingsProps) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    console.log('Uploading image:', file.name, file.size, file.type);
+
     const reader = new FileReader();
     reader.onload = () => {
-      callback(reader.result as string);
+      const result = reader.result as string;
+      console.log('Image read complete, length:', result.length);
+      callback(result);
+    };
+    reader.onerror = (err) => {
+      console.error('FileReader error:', err);
+      toast({ title: "Erro", description: "Falha ao ler o arquivo de imagem", variant: "destructive" });
     };
     reader.readAsDataURL(file);
   };
@@ -65,6 +73,7 @@ const GroupSettingsComponent = ({ group, onSave }: GroupSettingsProps) => {
   };
 
   const handleSave = async () => {
+    console.log('Saving group settings. Logo length:', logoUrl?.length || 0);
     setSaving(true);
     const settings: GroupSettingsType = {
       logoUrl,
@@ -73,11 +82,12 @@ const GroupSettingsComponent = ({ group, onSave }: GroupSettingsProps) => {
       visibility,
       roles: group.settings.roles,
     };
-    await onSave(
+    const success = await onSave(
       settings,
       name !== group.name ? name : undefined,
       slug !== group.slug ? slug : undefined,
     );
+    console.log('Save result:', success);
     setSaving(false);
   };
 
@@ -96,12 +106,13 @@ const GroupSettingsComponent = ({ group, onSave }: GroupSettingsProps) => {
             <div className="space-y-2">
               <Label>Logo do Grupo</Label>
               <div className="flex items-center gap-4">
-                <Avatar className="h-20 w-20 rounded-2xl border-2 border-slate-100 shadow-sm">
-                  <AvatarImage src={logoUrl || ""} className="object-contain" />
-                  <AvatarFallback className="bg-slate-50 text-slate-400">
-                    <ImageIcon className="h-8 w-8" />
-                  </AvatarFallback>
-                </Avatar>
+                <div className="h-20 w-20 rounded-2xl border-2 border-slate-100 shadow-sm bg-slate-50 flex items-center justify-center overflow-hidden">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Logo Preview" className="w-full h-full object-contain" />
+                  ) : (
+                    <ImageIcon className="h-8 w-8 text-slate-400" />
+                  )}
+                </div>
                 <div className="space-y-2">
                   <Button 
                     variant="outline" 
@@ -221,10 +232,13 @@ const GroupSettingsComponent = ({ group, onSave }: GroupSettingsProps) => {
             <div className="space-y-2">
               <Label>Escudo do Time (Upload)</Label>
               <div className="flex items-center gap-3">
-                <Avatar className="h-12 w-12 rounded-lg border shadow-sm">
-                  <AvatarImage src={homeSide.logoUrl || ""} className="object-contain" />
-                  <AvatarFallback className="text-[10px]">ESC</AvatarFallback>
-                </Avatar>
+                <div className="h-12 w-12 rounded-lg border shadow-sm bg-slate-50 flex items-center justify-center overflow-hidden">
+                  {homeSide.logoUrl ? (
+                    <img src={homeSide.logoUrl} alt="Home Logo" className="w-full h-full object-contain" />
+                  ) : (
+                    <span className="text-[10px] text-slate-400">ESC</span>
+                  )}
+                </div>
                 <Button variant="outline" size="sm" asChild>
                   <label className="cursor-pointer">
                     Selecionar Imagem
@@ -286,10 +300,13 @@ const GroupSettingsComponent = ({ group, onSave }: GroupSettingsProps) => {
             <div className="space-y-2">
               <Label>Escudo do Time (Upload)</Label>
               <div className="flex items-center gap-3">
-                <Avatar className="h-12 w-12 rounded-lg border shadow-sm">
-                  <AvatarImage src={awaySide.logoUrl || ""} className="object-contain" />
-                  <AvatarFallback className="text-[10px]">ESC</AvatarFallback>
-                </Avatar>
+                <div className="h-12 w-12 rounded-lg border shadow-sm bg-slate-50 flex items-center justify-center overflow-hidden">
+                  {awaySide.logoUrl ? (
+                    <img src={awaySide.logoUrl} alt="Away Logo" className="w-full h-full object-contain" />
+                  ) : (
+                    <span className="text-[10px] text-slate-400">ESC</span>
+                  )}
+                </div>
                 <Button variant="outline" size="sm" asChild>
                   <label className="cursor-pointer">
                     Selecionar Imagem
