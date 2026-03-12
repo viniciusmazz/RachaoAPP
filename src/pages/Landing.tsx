@@ -20,8 +20,16 @@ const FEATURES = [
 
 const LogoImage = ({ size, fallbackText }: { size: string, fallbackText: string }) => {
   const [error, setError] = useState(false);
-  const { appLogo } = useAppSettings();
+  const { appLogo, loading } = useAppSettings();
   
+  if (loading) {
+    return (
+      <div className={`${size} flex items-center justify-center bg-slate-100/50 rounded-2xl animate-pulse`}>
+        <div className="w-4 h-4 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div className={`${size} flex items-center justify-center text-primary font-black text-xl`}>
@@ -35,7 +43,10 @@ const LogoImage = ({ size, fallbackText }: { size: string, fallbackText: string 
       src={appLogo || logoUrl} 
       alt="Logo" 
       className={`${size} object-contain`}
-      onError={() => setError(true)}
+      onError={() => {
+        console.error('LogoImage (Landing): Error loading image');
+        setError(true);
+      }}
       referrerPolicy="no-referrer"
     />
   );

@@ -41,7 +41,18 @@ export default function FileUpload({ onFileUpload, existingFilePath }: FileUploa
     try {
       setUploading(true)
       
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) {
+        console.warn('Session error in FileUpload:', sessionError.message)
+        toast({
+          title: "Erro de autenticação",
+          description: "Sua sessão expirou. Por favor, faça login novamente.",
+          variant: "destructive"
+        })
+        return
+      }
+      
+      const session = sessionData?.session
       if (!session?.user) {
         toast({
           title: "Erro",

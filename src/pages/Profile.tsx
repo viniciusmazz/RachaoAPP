@@ -73,7 +73,7 @@ const Profile = () => {
       const fileExt = file.name.split('.').pop()
       const fileName = `${user.id}/profile-${Date.now()}.${fileExt}`
       
-      const { data, error } = await supabase.storage
+      const { data: uploadData, error } = await supabase.storage
         .from('avatars')
         .upload(fileName, file)
 
@@ -81,7 +81,7 @@ const Profile = () => {
 
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
-        .getPublicUrl(data.path)
+        .getPublicUrl(uploadData.path)
 
       setPhotoUrl(publicUrl)
       

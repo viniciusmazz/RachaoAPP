@@ -111,7 +111,15 @@ export const useUserGroups = () => {
 
   const fetchGroups = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) {
+        console.warn('Session error in fetchGroups:', sessionError.message);
+        setGroups([])
+        setLoading(false)
+        return
+      }
+      
+      const session = sessionData?.session
       if (!session?.user) {
         setGroups([])
         setLoading(false)
@@ -166,7 +174,9 @@ export const useUserGroups = () => {
 
   const createGroup = async (name: string, slug: string) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) throw sessionError
+      const session = sessionData?.session
       if (!session?.user) throw new Error('Not authenticated')
 
       // Check for 1 group limit (only for owned groups)

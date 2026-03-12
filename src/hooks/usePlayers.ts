@@ -58,7 +58,9 @@ export const usePlayers = (groupId?: string) => {
 
   const addPlayer = async (player: Omit<Player, 'id'>) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) console.warn('Session error in addPlayer:', sessionError.message)
+      const session = sessionData?.session
       const user = session?.user
       
       if (!user) {
@@ -204,7 +206,12 @@ export const usePlayers = (groupId?: string) => {
 
   const loadUserPlayers = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) {
+        console.warn('Session error in loadUserPlayers:', sessionError.message)
+        return loadPlayers()
+      }
+      const session = sessionData?.session
       const user = session?.user
       
       if (!user) {
@@ -242,7 +249,9 @@ export const usePlayers = (groupId?: string) => {
 
   const editPlayer = async (id: string, updatedPlayer: Omit<Player, 'id'>) => {
     try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError) console.warn('Session error in editPlayer:', sessionError.message)
+        const session = sessionData?.session
         const user = session?.user
       
       if (!user) {

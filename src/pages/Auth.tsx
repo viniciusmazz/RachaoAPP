@@ -13,8 +13,16 @@ import { Loader2 } from 'lucide-react'
 
 const LogoImage = () => {
   const [error, setError] = useState(false);
-  const { appLogo } = useAppSettings();
+  const { appLogo, loading } = useAppSettings();
   
+  if (loading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-slate-100/50 rounded-2xl animate-pulse">
+        <div className="w-6 h-6 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div className="w-full h-full flex items-center justify-center text-primary font-black text-2xl">
@@ -28,7 +36,10 @@ const LogoImage = () => {
       src={appLogo || logoUrl} 
       alt="RachãoApp Logo" 
       className="w-full h-full object-contain"
-      onError={() => setError(true)}
+      onError={() => {
+        console.error('LogoImage (Auth): Error loading image');
+        setError(true);
+      }}
       referrerPolicy="no-referrer"
     />
   );
@@ -62,7 +73,12 @@ const Auth = () => {
     // Check if user is already logged in
     const checkUser = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError) {
+          console.warn('Session error in checkUser:', sessionError.message)
+          return
+        }
+        const session = sessionData?.session
         if (session?.user) {
           console.log('User already logged in, redirecting to home')
           navigate('/')

@@ -17,8 +17,16 @@ import logoUrl from "/logo.png";
 
 const LogoImage = ({ size, fallbackText }: { size: string, fallbackText: string }) => {
   const [error, setError] = useState(false);
-  const { appLogo } = useAppSettings();
+  const { appLogo, loading } = useAppSettings();
   
+  if (loading) {
+    return (
+      <div className={`${size} flex items-center justify-center bg-slate-100/50 rounded-2xl animate-pulse`}>
+        <div className="w-4 h-4 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div className={`${size} flex items-center justify-center text-primary font-black text-xl`}>
@@ -32,7 +40,10 @@ const LogoImage = ({ size, fallbackText }: { size: string, fallbackText: string 
       src={appLogo || logoUrl} 
       alt="Logo" 
       className={`${size} object-contain`}
-      onError={() => setError(true)}
+      onError={() => {
+        console.error('LogoImage: Error loading image');
+        setError(true);
+      }}
       referrerPolicy="no-referrer"
     />
   );
@@ -284,18 +295,34 @@ const Home = () => {
                   >
                     <div className="h-1 w-full bg-primary" />
                     <CardHeader className="pb-4">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-xl font-bold group-hover:text-primary transition-colors">
-                          {group.name}
-                        </CardTitle>
-                        <div className="p-2 bg-secondary rounded-xl opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                          {group.settings.logoUrl ? (
+                            <img 
+                              src={group.settings.logoUrl} 
+                              alt={group.name} 
+                              className="w-full h-full object-contain p-1"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-primary font-black text-lg">
+                              {group.name.substring(0, 1).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-xl font-bold group-hover:text-primary transition-colors truncate">
+                            {group.name}
+                          </CardTitle>
+                          <CardDescription className="flex items-center gap-1 font-mono text-[10px] truncate">
+                            <span className="text-primary/60">rachao.app.br/</span>
+                            <span className="font-bold">{group.slug}</span>
+                          </CardDescription>
+                        </div>
+                        <div className="p-2 bg-secondary rounded-xl opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                           <ExternalLink className="h-4 w-4 text-primary" />
                         </div>
                       </div>
-                      <CardDescription className="flex items-center gap-1 font-mono text-xs">
-                        <span className="text-primary/60">rachao.app.br/</span>
-                        <span className="font-bold">{group.slug}</span>
-                      </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="flex items-center justify-between p-4 bg-secondary/50 rounded-2xl">

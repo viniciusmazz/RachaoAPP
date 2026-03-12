@@ -246,6 +246,18 @@ const Index = ({ group, refreshGroup }: IndexProps) => {
                   src={group.settings.logoUrl} 
                   alt={group.name} 
                   className="w-full h-full object-contain" 
+                  onError={(e) => {
+                    console.error('Group Logo Error:', group.name);
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    // Show fallback
+                    const parent = (e.target as HTMLImageElement).parentElement;
+                    if (parent) {
+                      const fallback = document.createElement('div');
+                      fallback.className = "w-full h-full bg-primary/5 flex items-center justify-center text-primary font-black text-2xl";
+                      fallback.innerText = group.name.substring(0, 1).toUpperCase();
+                      parent.appendChild(fallback);
+                    }
+                  }}
                   referrerPolicy="no-referrer"
                 />
               ) : (

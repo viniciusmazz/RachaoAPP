@@ -62,7 +62,9 @@ export const useMatches = (groupId?: string) => {
 
   const saveMatch = async (match: Omit<Match, 'id'>) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) console.warn('Session error in saveMatch:', sessionError.message)
+      const session = sessionData?.session
       const user = session?.user
       
       if (!user) {
@@ -193,7 +195,9 @@ export const useMatches = (groupId?: string) => {
 
   const updateMatch = async (matchId: string, updatedMatch: Omit<Match, 'id'>) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) console.warn('Session error in updateMatch:', sessionError.message)
+      const session = sessionData?.session
       const user = session?.user
       
       if (!user) {
@@ -254,7 +258,9 @@ export const useMatches = (groupId?: string) => {
 
   const deleteMatch = async (matchId: string) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) console.warn('Session error in deleteMatch:', sessionError.message)
+      const session = sessionData?.session
       const user = session?.user
       
       if (!user) {
