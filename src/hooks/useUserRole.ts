@@ -99,7 +99,6 @@ export const useUserRole = (groupId?: string) => {
             .maybeSingle()
           
           if (!playerError && playerData) {
-            console.log('useUserRole: User has player record in group, setting role to pending');
             // If they have a player but aren't in roles yet, they are pending
             setRole('pending')
             setLoading(false)
@@ -667,18 +666,17 @@ export const useUserRole = (groupId?: string) => {
       // This record acts as the "request" itself.
       const { data: existingPlayer, error: checkError } = await supabase
         .from('players')
-        .select('id, type')
+        .select('id, type, name')
         .eq('group_id', groupId)
         .eq('user_id', user.id)
         .maybeSingle()
 
       if (checkError) throw checkError
 
-      const requestType = 'convidado'; // Use a valid type to bypass DB constraint
+      const requestType = 'convidado'; 
       const requestName = `Solicitação: ${user.user_metadata?.name || user.email?.split('@')[0] || 'Novo Membro'}`;
 
       if (!existingPlayer) {
-        console.log('requestAccess: Creating player record for request');
         const { error: insertError } = await supabase
           .from('players')
           .insert({
@@ -686,15 +684,10 @@ export const useUserRole = (groupId?: string) => {
             user_id: user.id,
             name: requestName,
             type: requestType,
-            // We can add a custom field or just rely on the name prefix to identify requests
           })
-        if (insertError) {
-          console.error('requestAccess: Insert error', insertError);
-          throw insertError
-        }
+        if (insertError) throw insertError
       } else {
         // If they already have a record, update it to the new request type
-        console.log('requestAccess: Updating existing player record for request');
         const { error: updateError } = await supabase
           .from('players')
           .update({
@@ -702,10 +695,7 @@ export const useUserRole = (groupId?: string) => {
             type: requestType
           })
           .eq('id', existingPlayer.id)
-        if (updateError) {
-          console.error('requestAccess: Update error', updateError);
-          throw updateError
-        }
+        if (updateError) throw updateError
       }
 
       // Note: We NO LONGER try to update the groups table here because 
