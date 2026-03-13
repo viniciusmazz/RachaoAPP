@@ -230,7 +230,7 @@ export const useUserRole = (groupId?: string) => {
         
         // Check if this player record is a claim for another player
         const isClaim = playerLink?.type?.startsWith('claim:');
-        const isNewRequest = playerLink?.name?.startsWith('Solicitação:');
+        const isNewRequest = playerLink?.type === 'request:new';
         
         // If it's a claim, the ID is in the type string. 
         // If it's a new request, there is NO claimed player ID (the playerLink is just a placeholder)
@@ -389,7 +389,7 @@ export const useUserRole = (groupId?: string) => {
             .delete()
             .eq('user_id', userId)
             .eq('group_id', groupId)
-            .ilike('name', 'Solicitação:%');
+            .eq('type', 'request:new');
         }
         
         const { error: updateError } = await supabase
@@ -619,7 +619,7 @@ export const useUserRole = (groupId?: string) => {
 
           if (userPlayers && userPlayers.length > 0) {
             for (const p of userPlayers) {
-              if (p.type?.startsWith('claim:') || p.name?.startsWith('Solicitação:')) {
+              if (p.type?.startsWith('claim:') || p.type?.startsWith('request:')) {
                 console.log('rejectUser: Deleting placeholder player', p.id);
                 await supabase.from('players').delete().eq('id', p.id);
               } else {
@@ -674,7 +674,7 @@ export const useUserRole = (groupId?: string) => {
 
       if (checkError) throw checkError
 
-      const requestType = 'convidado';
+      const requestType = 'convidado'; // Use a valid type to bypass DB constraint
       const requestName = `Solicitação: ${user.user_metadata?.name || user.email?.split('@')[0] || 'Novo Membro'}`;
 
       if (!existingPlayer) {

@@ -292,7 +292,7 @@ const Index = ({ group, refreshGroup }: IndexProps) => {
                   
                   const isLinkedInSettings = Object.values(group.settings.playerLinks || {}).includes(p.id);
                   const isPendingLink = Object.values(group.settings.pendingLinks || {}).includes(p.id);
-                  return !isLinkedInTable && !isLinkedInSettings && !isPendingLink && p.type === 'mensalista';
+                  return !isLinkedInTable && !isLinkedInSettings && !isPendingLink;
                 })}
                 onRequestAccess={handleRequestAccess}
                 isPending={isPending}
@@ -345,7 +345,7 @@ const Index = ({ group, refreshGroup }: IndexProps) => {
                   const isLinkedInSettings = Object.values(group.settings.playerLinks || {}).includes(p.id);
                   const isPendingLink = Object.values(group.settings.pendingLinks || {}).includes(p.id);
                   
-                  return !isLinkedInSettings && !isPendingLink && p.type === 'mensalista';
+                  return !isLinkedInSettings && !isPendingLink;
                 })}
                 onRequestAccess={handleRequestAccess}
                 isPending={isPending}
