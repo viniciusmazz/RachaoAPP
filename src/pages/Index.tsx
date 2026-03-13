@@ -54,7 +54,8 @@ const Index = ({ group, refreshGroup }: IndexProps) => {
   const isOwner = user?.id === group.ownerId;
   const isPending = isGlobalPending && !isOwner;
   const isPrivate = group.settings.visibility === 'private';
-  const hasAccess = !isPrivate || isApproved || isOwner;
+  const isRejected = role === 'rejected';
+  const hasAccess = !isRejected && (!isPrivate || isApproved || isOwner);
 
   const handleRequestAccess = async (playerId?: string) => {
     setRequestingAccess(true);

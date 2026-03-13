@@ -292,6 +292,96 @@ export const useUserRole = (groupId?: string) => {
     }
   }, [user, groupId, role, isSuperAdmin])
 
+  const fetchGroupMembers = useCallback(async () => {
+    if (!groupId) return
+
+    try {
+      setRefreshingMembers(true)
+      const { data: groupData, error: groupError } = await supabase
+        .from('groups')
+        .select('settings, owner_id')
+        .eq('id', groupId)
+        .single()
+      
+      if (groupError) throw groupError
+      
+      const settings = (groupData.settings || {}) as unknown as GroupSettings;
+      const roles = settings?.roles || {}
+
+      const userIds = Object.keys(roles).filter(id => roles[id] !== 'pending')
+      
+      // Add owner if not in roles
+      if (!userIds.includes(groupData.owner_id)) {
+        userIds.push(groupData.owner_id)
+      }
+
+      if (userIds.length === 0) {
+        setGroupMembers([])
+        setRefreshingMembers(false)
+        return
+      }
+
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, email, name')
+        .in('user_id', userIds)
+
+      if (profilesError) throw profilesError
+
+      // Fetch ALL players in this group to resolve names for links
+      const { data: allGroupPlayers, error: playersError } = await supabase
+        .from('players')
+        .select('id, name, user_id')
+        .eq('group_id', groupId);
+      
+      if (playersError) {
+        console.error('Error fetching group players:', playersError);
+      }
+      
+      // Use a Map to store the link for each user
+      const linkedMap = new Map<string, { id: string; name: string }>();
+      
+      // MASTER LINK LOGIC:
+      // If settings.playerLinks exists, it is the EXCLUSIVE source of truth for this group.
+      // This prevents "ghost" links from appearing if the players table update failed due to RLS.
+      if (settings.playerLinks) {
+        Object.entries(settings.playerLinks).forEach(([uId, pId]) => {
+          const player = allGroupPlayers?.find(p => p.id === pId);
+          if (player) {
+            linkedMap.set(uId, { id: player.id, name: player.name });
+          }
+        });
+      } else {
+        // Legacy Mode: Fallback to players table if settings.playerLinks is not yet initialized
+        allGroupPlayers?.forEach(p => {
+          if (p.user_id && !linkedMap.has(p.user_id)) {
+            linkedMap.set(p.user_id, { id: p.id, name: p.name });
+          }
+        });
+      }
+
+      const members: GroupMember[] = profilesData.map(p => ({
+        user_id: p.user_id,
+        role: p.user_id === groupData.owner_id ? 'admin' : (roles[p.user_id] as AppRole || 'approved'),
+        email: p.email,
+        name: p.name,
+        player_id: linkedMap.get(p.user_id)?.id,
+        player_name: linkedMap.get(p.user_id)?.name
+      }))
+
+      setGroupMembers(members)
+    } catch (error) {
+      console.error('Error fetching group members:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar a lista de membros.",
+        variant: "destructive"
+      })
+    } finally {
+      setRefreshingMembers(false)
+    }
+  }, [groupId])
+
   useEffect(() => {
     if (!user || !groupId) return
 
@@ -312,6 +402,7 @@ export const useUserRole = (groupId?: string) => {
           console.log('useUserRole: Group updated via realtime', payload);
           fetchRole();
           fetchPendingUsers();
+          fetchGroupMembers();
         }
       )
       .subscribe()
@@ -331,6 +422,7 @@ export const useUserRole = (groupId?: string) => {
           console.log('useUserRole: Player table changed via realtime', payload);
           fetchRole();
           fetchPendingUsers();
+          fetchGroupMembers();
         }
       )
       .subscribe()
@@ -340,7 +432,7 @@ export const useUserRole = (groupId?: string) => {
       supabase.removeChannel(groupChannel)
       supabase.removeChannel(playerChannel)
     }
-  }, [user, groupId, fetchRole, fetchPendingUsers])
+  }, [user, groupId, fetchRole, fetchPendingUsers, fetchGroupMembers])
 
   const approveUser = async (userId: string, targetRole: AppRole = 'approved') => {
     const isActuallyAdmin = role === 'admin' || isSuperAdmin;
@@ -456,217 +548,125 @@ export const useUserRole = (groupId?: string) => {
     }
   }
 
-  const fetchGroupMembers = useCallback(async () => {
-    if (!groupId) return
-
-    try {
-      setRefreshingMembers(true)
-      const { data: groupData, error: groupError } = await supabase
-        .from('groups')
-        .select('settings, owner_id')
-        .eq('id', groupId)
-        .single()
-      
-      if (groupError) throw groupError
-      
-      const settings = (groupData.settings || {}) as unknown as GroupSettings;
-      const roles = settings?.roles || {}
-
-      console.log('fetchGroupMembers: Fetched group data', { 
-        ownerId: groupData.owner_id, 
-        hasSettings: !!groupData.settings,
-        hasPlayerLinks: !!settings.playerLinks,
-        rolesCount: Object.keys(roles).length
-      });
-      
-      const userIds = Object.keys(roles).filter(id => roles[id] !== 'pending' && roles[id] !== 'rejected')
-      
-      // Add owner if not in roles
-      if (!userIds.includes(groupData.owner_id)) {
-        userIds.push(groupData.owner_id)
-      }
-
-      console.log('fetchGroupMembers: Final userIds to fetch profiles for', userIds);
-
-      if (userIds.length === 0) {
-        setGroupMembers([])
-        return
-      }
-
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('user_id, email, name')
-        .in('user_id', userIds)
-
-      if (profilesError) throw profilesError
-
-      // Fetch ALL players in this group to resolve names for links
-      const { data: allGroupPlayers, error: playersError } = await supabase
-        .from('players')
-        .select('id, name, user_id')
-        .eq('group_id', groupId);
-      
-      if (playersError) {
-        console.error('Error fetching group players:', playersError);
-      }
-      
-      // Use a Map to store the link for each user
-      const linkedMap = new Map<string, { id: string; name: string }>();
-      
-      // MASTER LINK LOGIC:
-      // If settings.playerLinks exists, it is the EXCLUSIVE source of truth for this group.
-      // This prevents "ghost" links from appearing if the players table update failed due to RLS.
-      if (settings.playerLinks) {
-        console.log('fetchGroupMembers: Using playerLinks from settings (Master Mode)', settings.playerLinks);
-        Object.entries(settings.playerLinks).forEach(([uId, pId]) => {
-          const player = allGroupPlayers?.find(p => p.id === pId);
-          if (player) {
-            linkedMap.set(uId, { id: player.id, name: player.name });
-          }
-        });
-      } else {
-        // Legacy Mode: Fallback to players table if settings.playerLinks is not yet initialized
-        console.log('fetchGroupMembers: No playerLinks in settings, falling back to players table (Legacy Mode)');
-        allGroupPlayers?.forEach(p => {
-          if (p.user_id && !linkedMap.has(p.user_id)) {
-            linkedMap.set(p.user_id, { id: p.id, name: p.name });
-          }
-        });
-      }
-
-      const members: GroupMember[] = profilesData.map(p => ({
-        user_id: p.user_id,
-        role: p.user_id === groupData.owner_id ? 'admin' : (roles[p.user_id] as AppRole || 'approved'),
-        email: p.email,
-        name: p.name,
-        player_id: linkedMap.get(p.user_id)?.id,
-        player_name: linkedMap.get(p.user_id)?.name
-      }))
-
-      setGroupMembers(members)
-    } catch (error) {
-      console.error('Error fetching group members:', error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar a lista de membros.",
-        variant: "destructive"
-      })
-    } finally {
-      setRefreshingMembers(false)
-    }
-  }, [groupId])
-
-  const rejectUser = async (userId: string) => {
+  const removeMember = async (userId: string) => {
     const isActuallyAdmin = role === 'admin' || isSuperAdmin;
-    if (!user || !isActuallyAdmin) {
-      console.error('rejectUser: Not authorized', { role, isSuperAdmin });
-      toast({
-        title: "Não autorizado",
-        description: "Você não tem permissão para realizar esta ação.",
-        variant: "destructive"
-      });
-      return { success: false, error: 'Não autorizado' };
-    }
+    if (!user || !isActuallyAdmin) return { success: false, error: 'Não autorizado' };
 
     try {
       if (groupId) {
-        console.log('rejectUser: Starting rejection process', { groupId, userId });
-        
-        // 1. Fetch current group data
         const { data: groupData, error: groupError } = await supabase
           .from('groups')
           .select('settings')
           .eq('id', groupId)
-          .single()
+          .single();
         
-        if (groupError) {
-          console.error('rejectUser: Error fetching group data', groupError);
-          throw groupError;
-        }
+        if (groupError) throw groupError;
         
-        // 2. Update settings
-        const settings = (groupData.settings || {}) as unknown as GroupSettings
-        const roles = { ...(settings?.roles || {}) }
+        const settings = (groupData.settings || {}) as unknown as GroupSettings;
+        const roles = { ...(settings?.roles || {}) };
+        const pendingLinks = { ...(settings?.pendingLinks || {}) };
+        const playerLinks = { ...(settings?.playerLinks || {}) };
         
-        // ALWAYS set to 'rejected' to prevent them from reappearing in the pending list
-        // if they still have a player record in the group.
-        roles[userId] = 'rejected' as AppRole
+        delete roles[userId];
+        delete pendingLinks[userId];
+        delete playerLinks[userId];
         
-        const pendingLinks = { ...(settings?.pendingLinks || {}) }
-        delete pendingLinks[userId]
-        
-        const playerLinks = { ...(settings?.playerLinks || {}) }
-        delete playerLinks[userId]
-        
-        console.log('rejectUser: Updating group settings to rejected for user', userId);
-
         const { error: updateError } = await supabase
           .from('groups')
-          .update({ 
-            settings: { 
-              ...settings, 
-              roles, 
-              pendingLinks,
-              playerLinks
-            } 
-          })
-          .eq('id', groupId)
+          .update({ settings: { ...settings, roles, pendingLinks, playerLinks } })
+          .eq('id', groupId);
         
-        if (updateError) {
-          console.error('rejectUser: Error updating group settings', updateError);
-          throw updateError;
-        }
+        if (updateError) throw updateError;
+        
+        // Clean up player records (delete placeholders, nullify real ones)
+        const { data: userPlayers } = await supabase
+          .from('players')
+          .select('id, type, name')
+          .eq('group_id', groupId)
+          .eq('user_id', userId);
 
-        // 3. Handle player records (Best effort - don't let it fail the whole process)
-        try {
-          console.log('rejectUser: Cleaning up player records for user', userId);
-          
-          const { data: userPlayers } = await supabase
-            .from('players')
-            .select('id, type')
-            .eq('group_id', groupId)
-            .eq('user_id', userId);
-
-          if (userPlayers && userPlayers.length > 0) {
-            for (const p of userPlayers) {
-              if (p.type?.startsWith('claim:') || p.name?.startsWith('Solicitação:')) {
-                console.log('rejectUser: Deleting placeholder player', p.id);
-                await supabase.from('players').delete().eq('id', p.id);
-              } else {
-                console.log('rejectUser: Clearing user_id from real player', p.id);
-                await supabase.from('players').update({ user_id: null }).eq('id', p.id);
-              }
+        if (userPlayers) {
+          for (const p of userPlayers) {
+            if (p.type?.startsWith('claim:') || p.name?.startsWith('Solicitação:')) {
+              await supabase.from('players').delete().eq('id', p.id);
+            } else {
+              await supabase.from('players').update({ user_id: null }).eq('id', p.id);
             }
           }
-        } catch (playerErr) {
-          console.warn('rejectUser: Player cleanup failed (likely RLS), but group removal succeeded', playerErr);
         }
-
-        console.log('rejectUser: Rejection/Removal completed successfully');
-      } else {
-        console.log('rejectUser: Global rejection (user_roles)');
-        const { error } = await supabase
-          .from('user_roles')
-          .delete()
-          .eq('user_id', userId)
-
-        if (error) throw error
       }
-
-      // Force immediate refresh
+      
       await fetchPendingUsers();
       if (groupId) await fetchGroupMembers();
-
-      return { success: true }
+      return { success: true };
     } catch (error) {
-      console.error('Error rejecting user:', error)
-      toast({
-        title: "Erro",
-        description: "Ocorreu um erro ao processar a solicitação.",
-        variant: "destructive"
-      });
-      return { success: false, error }
+      console.error('Error removing member:', error);
+      return { success: false, error };
     }
+  };
+
+  const blockMember = async (userId: string) => {
+    const isActuallyAdmin = role === 'admin' || isSuperAdmin;
+    if (!user || !isActuallyAdmin) return { success: false, error: 'Não autorizado' };
+
+    try {
+      if (groupId) {
+        const { data: groupData, error: groupError } = await supabase
+          .from('groups')
+          .select('settings')
+          .eq('id', groupId)
+          .single();
+        
+        if (groupError) throw groupError;
+        
+        const settings = (groupData.settings || {}) as unknown as GroupSettings;
+        const roles = { ...(settings?.roles || {}), [userId]: 'rejected' as AppRole };
+        
+        await supabase.from('groups').update({ settings: { ...settings, roles } }).eq('id', groupId);
+      }
+      
+      await fetchPendingUsers();
+      if (groupId) await fetchGroupMembers();
+      return { success: true };
+    } catch (error) {
+      console.error('Error blocking member:', error);
+      return { success: false, error };
+    }
+  };
+
+  const unblockMember = async (userId: string) => {
+    const isActuallyAdmin = role === 'admin' || isSuperAdmin;
+    if (!user || !isActuallyAdmin) return { success: false, error: 'Não autorizado' };
+
+    try {
+      if (groupId) {
+        const { data: groupData, error: groupError } = await supabase
+          .from('groups')
+          .select('settings')
+          .eq('id', groupId)
+          .single();
+        
+        if (groupError) throw groupError;
+        
+        const settings = (groupData.settings || {}) as unknown as GroupSettings;
+        const roles = { ...(settings?.roles || {}) };
+        delete roles[userId];
+        
+        await supabase.from('groups').update({ settings: { ...settings, roles } }).eq('id', groupId);
+      }
+      
+      await fetchPendingUsers();
+      if (groupId) await fetchGroupMembers();
+      return { success: true };
+    } catch (error) {
+      console.error('Error unblocking member:', error);
+      return { success: false, error };
+    }
+  };
+
+  const rejectUser = async (userId: string) => {
+    // Keep rejectUser as an alias for blockMember for backward compatibility
+    return blockMember(userId);
   }
 
   const requestAccess = async (playerId?: string) => {
@@ -755,6 +755,9 @@ export const useUserRole = (groupId?: string) => {
     fetchGroupMembers,
     approveUser,
     rejectUser,
+    removeMember,
+    blockMember,
+    unblockMember,
     updateUserRole,
     requestAccess,
     refreshingMembers

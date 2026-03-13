@@ -33,8 +33,15 @@ interface GroupMembersProps {
 }
 
 const GroupMembers = ({ groupId, ownerId }: GroupMembersProps) => {
-  const { groupMembers, fetchGroupMembers, updateUserRole, rejectUser, refreshingMembers } = useUserRole(groupId);
+  console.log('GroupMembers: Rendering', { groupId });
+  const { groupMembers, fetchGroupMembers, fetchPendingUsers, updateUserRole, removeMember, blockMember, unblockMember, refreshingMembers } = useUserRole(groupId);
   const { players, linkPlayerToUser } = usePlayers(groupId);
+  
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    setVersion(v => v + 1);
+  }, [groupMembers]);
+
   const [linkingMember, setLinkingMember] = useState<GroupMember | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>("");
   const [isLinking, setIsLinking] = useState(false);
@@ -54,6 +61,14 @@ const GroupMembers = ({ groupId, ownerId }: GroupMembersProps) => {
     variant: 'warning'
   });
 
+  const handleRefresh = async () => {
+    await Promise.all([fetchGroupMembers(), fetchPendingUsers()]);
+    toast({
+      title: "Atualizado",
+      description: "Lista de membros atualizada com sucesso."
+    });
+  };
+
   useEffect(() => {
     fetchGroupMembers();
   }, [groupId, fetchGroupMembers]);
@@ -67,13 +82,12 @@ const GroupMembers = ({ groupId, ownerId }: GroupMembersProps) => {
       action: async () => {
         setProcessingId(userId);
         try {
-          const result = await rejectUser(userId);
+          const result = await removeMember(userId);
           if (result.success) {
             toast({
               title: "Membro removido",
               description: `${name} foi removido do grupo com sucesso.`
             });
-            // fetchGroupMembers is called inside rejectUser, but we call it again to be sure
             await fetchGroupMembers();
           }
         } finally {
@@ -81,6 +95,46 @@ const GroupMembers = ({ groupId, ownerId }: GroupMembersProps) => {
         }
       }
     });
+  };
+
+  const handleBlockMember = async (userId: string, name: string) => {
+    setConfirmDialog({
+      open: true,
+      title: "Bloquear Membro",
+      description: `Deseja bloquear ${name}? O usuário não poderá mais solicitar acesso ao grupo.`,
+      variant: 'danger',
+      action: async () => {
+        setProcessingId(userId);
+        try {
+          const result = await blockMember(userId);
+          if (result.success) {
+            toast({
+              title: "Membro bloqueado",
+              description: `${name} foi bloqueado do grupo.`
+            });
+            await fetchGroupMembers();
+          }
+        } finally {
+          setProcessingId(null);
+        }
+      }
+    });
+  };
+
+  const handleUnblockMember = async (userId: string, name: string) => {
+    setProcessingId(userId);
+    try {
+      const result = await unblockMember(userId);
+      if (result.success) {
+        toast({
+          title: "Membro desbloqueado",
+          description: `${name} foi desbloqueado.`
+        });
+        await fetchGroupMembers();
+      }
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   const handleUnlinkPlayer = async (member: GroupMember) => {
@@ -149,6 +203,9 @@ const GroupMembers = ({ groupId, ownerId }: GroupMembersProps) => {
     }
   };
 
+  const activeMembers = groupMembers.filter(m => m.role !== 'rejected');
+  const blockedMembers = groupMembers.filter(m => m.role === 'rejected');
+
   if (groupMembers.length === 0 && !refreshingMembers) {
     return (
       <div className="text-center py-8 text-slate-400">
@@ -167,120 +224,151 @@ const GroupMembers = ({ groupId, ownerId }: GroupMembersProps) => {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-end mb-2">
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => fetchGroupMembers()} 
-          disabled={refreshingMembers}
-          className="rounded-xl font-bold text-slate-500"
-        >
-          <RefreshCw className={cn("h-4 w-4 mr-2", refreshingMembers && "animate-spin")} />
-          {refreshingMembers ? "Atualizando..." : "Atualizar Lista"}
-        </Button>
-      </div>
-      {groupMembers.map((member) => (
-        <div 
-          key={member.user_id} 
-          className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-100 rounded-2xl bg-white transition-all hover:shadow-sm gap-4"
-        >
-          <div className="flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-bold text-slate-900">{member.name || member.email}</span>
-              {getRoleBadge(member.role)}
-              {member.user_id === ownerId && (
-                <Badge variant="outline" className="border-slate-200 text-slate-400 font-bold">Dono</Badge>
-              )}
-              {member.player_id && (
-                <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-bold gap-1">
-                  <User className="h-3 w-3" />
-                  Vinculado: {member.player_name}
-                </Badge>
-              )}
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-black text-slate-900">Membros Ativos</h3>
+          <Button variant="outline" size="sm" onClick={handleRefresh} className="rounded-xl font-bold">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Atualizar
+          </Button>
+        </div>
+        {activeMembers.map((member) => (
+          <div 
+            key={member.user_id} 
+            className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-slate-100 rounded-2xl bg-white transition-all hover:shadow-sm gap-4"
+          >
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-bold text-slate-900">{member.name || member.email}</span>
+                {getRoleBadge(member.role)}
+                {member.user_id === ownerId && (
+                  <Badge variant="outline" className="border-slate-200 text-slate-400 font-bold">Dono</Badge>
+                )}
+                {member.player_id && (
+                  <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-bold gap-1">
+                    <User className="h-3 w-3" />
+                    Vinculado: {member.player_name}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-slate-500 font-medium">{member.email}</p>
             </div>
-            <p className="text-sm text-slate-500 font-medium">{member.email}</p>
-          </div>
-          
-          <div className="flex items-center gap-2 justify-end">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => {
-                setLinkingMember(member);
-                setSelectedPlayerId(member.player_id || "");
-              }}
-              className={cn(
-                "rounded-xl font-bold h-9 transition-all",
-                member.player_id 
-                  ? "border-slate-200 text-slate-500 hover:bg-slate-50" 
-                  : "border-primary/20 text-primary hover:bg-primary/5"
-              )}
-            >
-              <LinkIcon className="h-3.5 w-3.5 mr-2" />
-              {member.player_id ? 'Alterar Vínculo' : 'Vincular Jogador'}
-            </Button>
+            
+            <div className="flex items-center gap-2 justify-end">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  setLinkingMember(member);
+                  setSelectedPlayerId(member.player_id || "");
+                }}
+                className={cn(
+                  "rounded-xl font-bold h-9 transition-all",
+                  member.player_id 
+                    ? "border-slate-200 text-slate-500 hover:bg-slate-50" 
+                    : "border-primary/20 text-primary hover:bg-primary/5"
+                )}
+              >
+                <LinkIcon className="h-3.5 w-3.5 mr-2" />
+                {member.player_id ? 'Alterar Vínculo' : 'Vincular Jogador'}
+              </Button>
 
-            {member.user_id !== ownerId && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-xl">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="rounded-xl">
-                  <div className="px-2 py-1.5 text-xs font-black text-slate-400 uppercase tracking-widest">Alterar Cargo</div>
-                  <DropdownMenuItem onClick={() => handleUpdateRole(member.user_id, 'atleta')} className="gap-2 font-bold">
-                    <User className="h-4 w-4" />
-                    Atleta
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleUpdateRole(member.user_id, 'financeiro')} className="gap-2 font-bold">
-                    <DollarSign className="h-4 w-4" />
-                    Financeiro
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleUpdateRole(member.user_id, 'admin')} className="gap-2 font-bold">
-                    <Shield className="h-4 w-4" />
-                    Admin
-                  </DropdownMenuItem>
-                  <div className="h-px bg-slate-100 my-1" />
-                  <DropdownMenuItem 
-                    onClick={() => {
-                      setLinkingMember(member);
-                      setSelectedPlayerId(member.player_id || "");
-                    }} 
-                    className="gap-2 font-bold text-primary focus:text-primary focus:bg-primary/5"
-                  >
-                    <LinkIcon className="h-4 w-4" />
-                    {member.player_id ? 'Alterar Vínculo' : 'Vincular a Jogador'}
-                  </DropdownMenuItem>
-                  {member.player_id && (
+              {member.user_id !== ownerId && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="rounded-xl">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="rounded-xl">
+                    <div className="px-2 py-1.5 text-xs font-black text-slate-400 uppercase tracking-widest">Alterar Cargo</div>
+                    <DropdownMenuItem onClick={() => handleUpdateRole(member.user_id, 'atleta')} className="gap-2 font-bold">
+                      <User className="h-4 w-4" />
+                      Atleta
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleUpdateRole(member.user_id, 'financeiro')} className="gap-2 font-bold">
+                      <DollarSign className="h-4 w-4" />
+                      Financeiro
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleUpdateRole(member.user_id, 'admin')} className="gap-2 font-bold">
+                      <Shield className="h-4 w-4" />
+                      Admin
+                    </DropdownMenuItem>
+                    <div className="h-px bg-slate-100 my-1" />
                     <DropdownMenuItem 
-                      onClick={() => handleUnlinkPlayer(member)} 
+                      onClick={() => {
+                        setLinkingMember(member);
+                        setSelectedPlayerId(member.player_id || "");
+                      }} 
+                      className="gap-2 font-bold text-primary focus:text-primary focus:bg-primary/5"
+                    >
+                      <LinkIcon className="h-4 w-4" />
+                      {member.player_id ? 'Alterar Vínculo' : 'Vincular a Jogador'}
+                    </DropdownMenuItem>
+                    {member.player_id && (
+                      <DropdownMenuItem 
+                        onClick={() => handleUnlinkPlayer(member)} 
+                        className="gap-2 font-bold text-orange-600 focus:text-orange-600 focus:bg-orange-50"
+                      >
+                        <LinkIcon className="h-4 w-4 rotate-45" />
+                        Remover Vínculo
+                      </DropdownMenuItem>
+                    )}
+                    <div className="h-px bg-slate-100 my-1" />
+                    <DropdownMenuItem 
+                      disabled={!!processingId}
+                      onClick={() => handleBlockMember(member.user_id, member.name || member.email)} 
                       className="gap-2 font-bold text-orange-600 focus:text-orange-600 focus:bg-orange-50"
                     >
-                      <LinkIcon className="h-4 w-4 rotate-45" />
-                      Remover Vínculo
+                      <Shield className="h-4 w-4" />
+                      Bloquear Membro
                     </DropdownMenuItem>
-                  )}
-                  <div className="h-px bg-slate-100 my-1" />
-                  <DropdownMenuItem 
-                    disabled={!!processingId}
-                    onClick={() => handleRemoveMember(member.user_id, member.name || member.email)} 
-                    className="gap-2 font-bold text-red-600 focus:text-red-600 focus:bg-red-50"
-                  >
-                    {processingId === member.user_id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                    Remover do Grupo
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+                    <DropdownMenuItem 
+                      disabled={!!processingId}
+                      onClick={() => handleRemoveMember(member.user_id, member.name || member.email)} 
+                      className="gap-2 font-bold text-red-600 focus:text-red-600 focus:bg-red-50"
+                    >
+                      {processingId === member.user_id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                      Remover do Grupo
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           </div>
+        ))}
+      </div>
+
+      {blockedMembers.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-black text-slate-900">Membros Bloqueados</h3>
+          {blockedMembers.map((member) => (
+            <div 
+              key={member.user_id} 
+              className="flex items-center justify-between p-4 border border-slate-100 rounded-2xl bg-slate-50 transition-all gap-4"
+            >
+              <div className="flex-1">
+                <span className="font-bold text-slate-900">{member.name || member.email}</span>
+                <p className="text-sm text-slate-500 font-medium">{member.email}</p>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => handleUnblockMember(member.user_id, member.name || member.email)}
+                className="rounded-xl font-bold h-9 bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 transition-all"
+              >
+                <RefreshCw className="h-3.5 w-3.5 mr-2" />
+                Desbloquear
+              </Button>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
 
       <Dialog open={confirmDialog.open} onOpenChange={(open) => !open && setConfirmDialog(prev => ({ ...prev, open: false }))}>
         <DialogContent className="rounded-3xl">
