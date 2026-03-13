@@ -230,7 +230,7 @@ export const useUserRole = (groupId?: string) => {
         
         // Check if this player record is a claim for another player
         const isClaim = playerLink?.type?.startsWith('claim:');
-        const isNewRequest = playerLink?.type === 'request:new';
+        const isNewRequest = playerLink?.name?.startsWith('Solicitação:');
         
         // If it's a claim, the ID is in the type string. 
         // If it's a new request, there is NO claimed player ID (the playerLink is just a placeholder)
@@ -389,7 +389,7 @@ export const useUserRole = (groupId?: string) => {
             .delete()
             .eq('user_id', userId)
             .eq('group_id', groupId)
-            .eq('type', 'request:new');
+            .ilike('name', 'Solicitação:%');
         }
         
         const { error: updateError } = await supabase
@@ -619,7 +619,7 @@ export const useUserRole = (groupId?: string) => {
 
           if (userPlayers && userPlayers.length > 0) {
             for (const p of userPlayers) {
-              if (p.type?.startsWith('claim:') || p.type?.startsWith('request:')) {
+              if (p.type?.startsWith('claim:') || p.name?.startsWith('Solicitação:')) {
                 console.log('rejectUser: Deleting placeholder player', p.id);
                 await supabase.from('players').delete().eq('id', p.id);
               } else {
@@ -674,7 +674,7 @@ export const useUserRole = (groupId?: string) => {
 
       if (checkError) throw checkError
 
-      const requestType = playerId ? `claim:${playerId}` : 'request:new';
+      const requestType = 'convidado';
       const requestName = `Solicitação: ${user.user_metadata?.name || user.email?.split('@')[0] || 'Novo Membro'}`;
 
       if (!existingPlayer) {
@@ -688,7 +688,10 @@ export const useUserRole = (groupId?: string) => {
             type: requestType,
             // We can add a custom field or just rely on the name prefix to identify requests
           })
-        if (insertError) throw insertError
+        if (insertError) {
+          console.error('requestAccess: Insert error', insertError);
+          throw insertError
+        }
       } else {
         // If they already have a record, update it to the new request type
         console.log('requestAccess: Updating existing player record for request');
@@ -699,7 +702,10 @@ export const useUserRole = (groupId?: string) => {
             type: requestType
           })
           .eq('id', existingPlayer.id)
-        if (updateError) throw updateError
+        if (updateError) {
+          console.error('requestAccess: Update error', updateError);
+          throw updateError
+        }
       }
 
       // Note: We NO LONGER try to update the groups table here because 
