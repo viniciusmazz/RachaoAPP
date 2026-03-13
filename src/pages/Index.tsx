@@ -284,7 +284,12 @@ const Index = ({ group, refreshGroup }: IndexProps) => {
           <div className="flex flex-wrap gap-2">
             {!isApproved && !isPending && user && (
               <JoinGroupDialog 
-                players={players.filter(p => !p.userId)}
+                players={players.filter(p => {
+                  const isLinkedInTable = !!p.userId;
+                  const isLinkedInSettings = Object.values(group.settings.playerLinks || {}).includes(p.id);
+                  const isPendingLink = Object.values(group.settings.pendingLinks || {}).includes(p.id);
+                  return !isLinkedInTable && !isLinkedInSettings && !isPendingLink;
+                })}
                 onRequestAccess={handleRequestAccess}
                 isPending={isPending}
               />
@@ -339,8 +344,12 @@ const Index = ({ group, refreshGroup }: IndexProps) => {
               {canAccessProtectedFeatures && (
                 <>
                   <TabsTrigger value="cadastro" className="rounded-xl px-6 py-2.5 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">Jogadores</TabsTrigger>
-                  <TabsTrigger value="escalacao" className="rounded-xl px-6 py-2.5 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">Escalação</TabsTrigger>
-                  <TabsTrigger value="partida" className="rounded-xl px-6 py-2.5 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">Partida</TabsTrigger>
+                  {isAdmin && (
+                    <>
+                      <TabsTrigger value="escalacao" className="rounded-xl px-6 py-2.5 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">Escalação</TabsTrigger>
+                      <TabsTrigger value="partida" className="rounded-xl px-6 py-2.5 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">Partida</TabsTrigger>
+                    </>
+                  )}
                 </>
               )}
               {isFinanceiro && (
@@ -390,6 +399,7 @@ const Index = ({ group, refreshGroup }: IndexProps) => {
                         onEdit={editPlayer}
                         onLoadUserPlayers={loadUserPlayers}
                         isAuthenticated={!!user}
+                        isAdmin={isAdmin}
                       />
                     </section>
                   </TabsContent>

@@ -4,7 +4,7 @@ import { usePlayers } from "@/hooks/usePlayers";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Shield, DollarSign, User, MoreVertical, Trash2, Link as LinkIcon } from "lucide-react";
+import { Shield, DollarSign, User, MoreVertical, Trash2, Link as LinkIcon, Loader2, RefreshCw } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,15 +33,92 @@ interface GroupMembersProps {
 }
 
 const GroupMembers = ({ groupId, ownerId }: GroupMembersProps) => {
-  const { groupMembers, fetchGroupMembers, updateUserRole, rejectUser } = useUserRole(groupId);
+  const { groupMembers, fetchGroupMembers, updateUserRole, rejectUser, refreshingMembers } = useUserRole(groupId);
   const { players, linkPlayerToUser } = usePlayers(groupId);
   const [linkingMember, setLinkingMember] = useState<GroupMember | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>("");
   const [isLinking, setIsLinking] = useState(false);
 
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    action: () => Promise<void>;
+    variant: 'danger' | 'warning';
+  }>({
+    open: false,
+    title: "",
+    description: "",
+    action: async () => {},
+    variant: 'warning'
+  });
+
   useEffect(() => {
     fetchGroupMembers();
   }, [groupId, fetchGroupMembers]);
+
+  const handleRemoveMember = async (userId: string, name: string) => {
+    setConfirmDialog({
+      open: true,
+      title: "Remover Membro",
+      description: `Deseja realmente remover ${name} do grupo? Esta ação não pode ser desfeita.`,
+      variant: 'danger',
+      action: async () => {
+        setProcessingId(userId);
+        try {
+          const result = await rejectUser(userId);
+          if (result.success) {
+            toast({
+              title: "Membro removido",
+              description: `${name} foi removido do grupo com sucesso.`
+            });
+            // fetchGroupMembers is called inside rejectUser, but we call it again to be sure
+            await fetchGroupMembers();
+          }
+        } finally {
+          setProcessingId(null);
+        }
+      }
+    });
+  };
+
+  const handleUnlinkPlayer = async (member: GroupMember) => {
+    setConfirmDialog({
+      open: true,
+      title: "Remover Vínculo",
+      description: `Deseja remover o vínculo de ${member.name || member.email} com o jogador ${member.player_name}?`,
+      variant: 'warning',
+      action: async () => {
+        setProcessingId(member.user_id);
+        try {
+          console.log('handleUnlinkPlayer: Removing link for user', member.user_id);
+          const result = await linkPlayerToUser("", member.user_id);
+          if (result.success) {
+            await fetchGroupMembers();
+          }
+        } finally {
+          setProcessingId(null);
+        }
+      }
+    });
+  };
+
+  const handleUpdateRole = async (userId: string, role: AppRole) => {
+    setProcessingId(userId);
+    try {
+      const result = await updateUserRole(userId, role);
+      if (result.success) {
+        toast({
+          title: "Cargo atualizado",
+          description: "O cargo do membro foi alterado com sucesso."
+        });
+        await fetchGroupMembers();
+      }
+    } finally {
+      setProcessingId(null);
+    }
+  };
 
   const handleLinkPlayer = async () => {
     if (!linkingMember || !selectedPlayerId) return;
@@ -52,7 +129,7 @@ const GroupMembers = ({ groupId, ownerId }: GroupMembersProps) => {
       if (result.success) {
         setLinkingMember(null);
         setSelectedPlayerId("");
-        fetchGroupMembers();
+        await fetchGroupMembers();
       }
     } finally {
       setIsLinking(false);
@@ -72,16 +149,37 @@ const GroupMembers = ({ groupId, ownerId }: GroupMembersProps) => {
     }
   };
 
-  if (groupMembers.length === 0) {
+  if (groupMembers.length === 0 && !refreshingMembers) {
     return (
       <div className="text-center py-8 text-slate-400">
         <p className="font-medium">Nenhum membro encontrado</p>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => fetchGroupMembers()} 
+          className="mt-2 rounded-xl font-bold"
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Atualizar
+        </Button>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end mb-2">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => fetchGroupMembers()} 
+          disabled={refreshingMembers}
+          className="rounded-xl font-bold text-slate-500"
+        >
+          <RefreshCw className={cn("h-4 w-4 mr-2", refreshingMembers && "animate-spin")} />
+          {refreshingMembers ? "Atualizando..." : "Atualizar Lista"}
+        </Button>
+      </div>
       {groupMembers.map((member) => (
         <div 
           key={member.user_id} 
@@ -132,15 +230,15 @@ const GroupMembers = ({ groupId, ownerId }: GroupMembersProps) => {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="rounded-xl">
                   <div className="px-2 py-1.5 text-xs font-black text-slate-400 uppercase tracking-widest">Alterar Cargo</div>
-                  <DropdownMenuItem onClick={() => updateUserRole(member.user_id, 'atleta')} className="gap-2 font-bold">
+                  <DropdownMenuItem onClick={() => handleUpdateRole(member.user_id, 'atleta')} className="gap-2 font-bold">
                     <User className="h-4 w-4" />
                     Atleta
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => updateUserRole(member.user_id, 'financeiro')} className="gap-2 font-bold">
+                  <DropdownMenuItem onClick={() => handleUpdateRole(member.user_id, 'financeiro')} className="gap-2 font-bold">
                     <DollarSign className="h-4 w-4" />
                     Financeiro
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => updateUserRole(member.user_id, 'admin')} className="gap-2 font-bold">
+                  <DropdownMenuItem onClick={() => handleUpdateRole(member.user_id, 'admin')} className="gap-2 font-bold">
                     <Shield className="h-4 w-4" />
                     Admin
                   </DropdownMenuItem>
@@ -157,12 +255,7 @@ const GroupMembers = ({ groupId, ownerId }: GroupMembersProps) => {
                   </DropdownMenuItem>
                   {member.player_id && (
                     <DropdownMenuItem 
-                      onClick={async () => {
-                        if (confirm(`Deseja remover o vínculo de ${member.name || member.email} com o jogador ${member.player_name}?`)) {
-                          await linkPlayerToUser("", member.user_id);
-                          fetchGroupMembers();
-                        }
-                      }} 
+                      onClick={() => handleUnlinkPlayer(member)} 
                       className="gap-2 font-bold text-orange-600 focus:text-orange-600 focus:bg-orange-50"
                     >
                       <LinkIcon className="h-4 w-4 rotate-45" />
@@ -171,10 +264,15 @@ const GroupMembers = ({ groupId, ownerId }: GroupMembersProps) => {
                   )}
                   <div className="h-px bg-slate-100 my-1" />
                   <DropdownMenuItem 
-                    onClick={() => rejectUser(member.user_id)} 
+                    disabled={!!processingId}
+                    onClick={() => handleRemoveMember(member.user_id, member.name || member.email)} 
                     className="gap-2 font-bold text-red-600 focus:text-red-600 focus:bg-red-50"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    {processingId === member.user_id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
                     Remover do Grupo
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -183,6 +281,40 @@ const GroupMembers = ({ groupId, ownerId }: GroupMembersProps) => {
           </div>
         </div>
       ))}
+
+      <Dialog open={confirmDialog.open} onOpenChange={(open) => !open && setConfirmDialog(prev => ({ ...prev, open: false }))}>
+        <DialogContent className="rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-slate-900">{confirmDialog.title}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-slate-500 font-medium">
+              {confirmDialog.description}
+            </p>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="ghost" 
+              onClick={() => setConfirmDialog(prev => ({ ...prev, open: false }))}
+              className="rounded-xl font-bold"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={async () => {
+                setConfirmDialog(prev => ({ ...prev, open: false }));
+                await confirmDialog.action();
+              }}
+              className={cn(
+                "rounded-xl font-bold",
+                confirmDialog.variant === 'danger' ? "bg-red-600 hover:bg-red-700 text-white" : "bg-primary hover:bg-primary/90"
+              )}
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!linkingMember} onOpenChange={(open) => !open && setLinkingMember(null)}>
         <DialogContent className="rounded-3xl">

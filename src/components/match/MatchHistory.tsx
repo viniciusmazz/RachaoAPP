@@ -28,7 +28,7 @@ export default function MatchHistory({ matches, players, onMatchUpdate, onMatchD
   const homeConfig = group.settings.sides.home;
   const awayConfig = group.settings.sides.away;
   const { isAuthenticated } = useAuth();
-  const { isAdmin } = useUserRole();
+  const { isAdmin } = useUserRole(group.id);
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -474,7 +474,7 @@ export default function MatchHistory({ matches, players, onMatchUpdate, onMatchD
                         </Button>
                       )}
                       
-                      {onMatchUpdate && isAuthenticated && (
+                      {isAdmin && onMatchUpdate && isAuthenticated && (
                         <EditMatchDialog 
                           match={match} 
                           players={players} 

@@ -27,6 +27,7 @@ interface PlayerFormProps {
   onEdit: (id: string, player: Omit<Player, 'id'>) => void;
   onLoadUserPlayers?: () => void;
   isAuthenticated?: boolean;
+  isAdmin?: boolean;
 }
 
 export default function PlayerForm({ 
@@ -35,7 +36,8 @@ export default function PlayerForm({
   onRemove, 
   onEdit, 
   onLoadUserPlayers, 
-  isAuthenticated = false 
+  isAuthenticated = false,
+  isAdmin = false
 }: PlayerFormProps) {
   const [name, setName] = useState("");
   const [type, setType] = useState<PlayerType>("mensalista");
@@ -114,95 +116,99 @@ export default function PlayerForm({
               </div>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => handleEdit(p)}>Editar</Button>
-            <Button variant="destructive" size="sm" onClick={() => onRemove(p.id)}>Remover</Button>
-          </div>
+          {isAdmin && (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => handleEdit(p)}>Editar</Button>
+              <Button variant="destructive" size="sm" onClick={() => onRemove(p.id)}>Remover</Button>
+            </div>
+          )}
         </li>
       ))}
     </ul>
   );
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className={`grid gap-6 ${isAdmin ? "md:grid-cols-2" : "grid-cols-1"}`}>
       {/* Form - sticky on desktop */}
-      <div className="md:sticky md:top-6 md:self-start">
-        <Card>
-          <CardHeader>
-            <CardTitle>{editingId ? "Editar Jogador" : "Novo Jogador"}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-2">
-              <label className="text-sm">Nome</label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: João Silva" />
-            </div>
-            <div className="grid gap-2">
-              <label className="text-sm">Tipo</label>
-              <Select value={type} onValueChange={(v) => setType(v as PlayerType)}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mensalista">Mensalista</SelectItem>
-                  <SelectItem value="convidado">Convidado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <label className="text-sm">Foto do atleta</label>
-              <Input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0] ?? null;
-                  setPhotoFile(file);
-                  if (!file) { setPreview(undefined); return; }
-                  const reader = new FileReader();
-                  reader.onload = () => setPreview(reader.result as string);
-                  reader.readAsDataURL(file);
-                }}
-              />
-              {preview && (
-                <div className="flex items-center gap-3 pt-1">
-                  <Avatar><AvatarImage src={preview} alt="Pré-visualização" /><AvatarFallback>FT</AvatarFallback></Avatar>
-                  <span className="text-xs text-muted-foreground truncate">{photoFile?.name}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="grid gap-3">
-              <Label className="text-sm font-medium">Posições e Habilidades</Label>
-              <div className="flex flex-wrap gap-3">
-                {POSITIONS.map(pos => {
-                  const selected = positions.find(p => p.position === pos.value);
-                  return (
-                    <div key={pos.value} className="flex items-center gap-2">
-                      <Checkbox id={`pos-${pos.value}`} checked={!!selected} onCheckedChange={() => togglePosition(pos.value)} />
-                      <label htmlFor={`pos-${pos.value}`} className="text-sm cursor-pointer">{pos.label}</label>
-                    </div>
-                  );
-                })}
+      {isAdmin && (
+        <div className="md:sticky md:top-6 md:self-start">
+          <Card>
+            <CardHeader>
+              <CardTitle>{editingId ? "Editar Jogador" : "Novo Jogador"}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-2">
+                <label className="text-sm">Nome</label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: João Silva" />
               </div>
-              {positions.length > 0 && (
-                <div className="space-y-3 rounded-md border p-3">
-                  {positions.map(ps => (
-                    <div key={ps.position} className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">{getPositionLabel(ps.position)}</span>
-                        <span className="text-sm font-bold text-primary">{ps.skill}/5</span>
-                      </div>
-                      <Slider min={1} max={5} step={1} value={[ps.skill]} onValueChange={([v]) => updateSkill(ps.position, v)} />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+              <div className="grid gap-2">
+                <label className="text-sm">Tipo</label>
+                <Select value={type} onValueChange={(v) => setType(v as PlayerType)}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mensalista">Mensalista</SelectItem>
+                    <SelectItem value="convidado">Convidado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm">Foto do atleta</label>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    setPhotoFile(file);
+                    if (!file) { setPreview(undefined); return; }
+                    const reader = new FileReader();
+                    reader.onload = () => setPreview(reader.result as string);
+                    reader.readAsDataURL(file);
+                  }}
+                />
+                {preview && (
+                  <div className="flex items-center gap-3 pt-1">
+                    <Avatar><AvatarImage src={preview} alt="Pré-visualização" /><AvatarFallback>FT</AvatarFallback></Avatar>
+                    <span className="text-xs text-muted-foreground truncate">{photoFile?.name}</span>
+                  </div>
+                )}
+              </div>
 
-            <div className="flex gap-2">
-              <Button onClick={handleSubmit}>{editingId ? "Salvar" : "Adicionar"}</Button>
-              {editingId && <Button variant="outline" onClick={clearForm}>Cancelar</Button>}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              <div className="grid gap-3">
+                <Label className="text-sm font-medium">Posições e Habilidades</Label>
+                <div className="flex flex-wrap gap-3">
+                  {POSITIONS.map(pos => {
+                    const selected = positions.find(p => p.position === pos.value);
+                    return (
+                      <div key={pos.value} className="flex items-center gap-2">
+                        <Checkbox id={`pos-${pos.value}`} checked={!!selected} onCheckedChange={() => togglePosition(pos.value)} />
+                        <label htmlFor={`pos-${pos.value}`} className="text-sm cursor-pointer">{pos.label}</label>
+                      </div>
+                    );
+                  })}
+                </div>
+                {positions.length > 0 && (
+                  <div className="space-y-3 rounded-md border p-3">
+                    {positions.map(ps => (
+                      <div key={ps.position} className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">{getPositionLabel(ps.position)}</span>
+                          <span className="text-sm font-bold text-primary">{ps.skill}/5</span>
+                        </div>
+                        <Slider min={1} max={5} step={1} value={[ps.skill]} onValueChange={([v]) => updateSkill(ps.position, v)} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <Button onClick={handleSubmit}>{editingId ? "Salvar" : "Adicionar"}</Button>
+                {editingId && <Button variant="outline" onClick={clearForm}>Cancelar</Button>}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Player list with tabs */}
       <Card>

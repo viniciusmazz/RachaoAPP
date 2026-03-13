@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserGroups } from "@/hooks/useGroup";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -328,9 +329,22 @@ const Dashboard = () => {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <CardTitle className="text-xl font-bold group-hover:text-primary transition-colors truncate">
-                            {group.name}
-                          </CardTitle>
+                          <div className="flex items-center gap-2 mb-1">
+                            <CardTitle className="text-xl font-bold group-hover:text-primary transition-colors truncate">
+                              {group.name}
+                            </CardTitle>
+                            {group.ownerId === user.id ? (
+                              <Badge className="bg-amber-500 hover:bg-amber-600 text-[10px] font-black uppercase tracking-wider h-5">
+                                <Shield className="h-3 w-3 mr-1" />
+                                Dono
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 text-[10px] font-black uppercase tracking-wider h-5">
+                                <User className="h-3 w-3 mr-1" />
+                                Jogador
+                              </Badge>
+                            )}
+                          </div>
                           <CardDescription className="flex items-center gap-1 font-mono text-[10px] truncate">
                             <span className="text-primary/60">rachao.app.br/</span>
                             <span className="font-bold">{group.slug}</span>

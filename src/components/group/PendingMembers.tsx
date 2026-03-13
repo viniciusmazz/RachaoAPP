@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useUserRole, type AppRole } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, Clock, UserCheck, Shield, DollarSign, User } from "lucide-react";
+import { Check, X, Clock, UserCheck, Shield, DollarSign, User, Loader2 } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +17,7 @@ interface PendingMembersProps {
 
 const PendingMembers = ({ groupId }: PendingMembersProps) => {
   const { pendingUsers, fetchPendingUsers, approveUser, rejectUser, role, isAdmin } = useUserRole(groupId);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
     console.log('PendingMembers: useEffect triggering fetchPendingUsers', { groupId, role, isAdmin });
@@ -23,7 +25,39 @@ const PendingMembers = ({ groupId }: PendingMembersProps) => {
   }, [groupId, fetchPendingUsers, role, isAdmin]);
 
   const handleApprove = async (userId: string, role: AppRole) => {
-    await approveUser(userId, role);
+    setProcessingId(userId);
+    const result = await approveUser(userId, role);
+    if (result.success) {
+      toast({
+        title: "Membro aprovado",
+        description: "O usuário agora faz parte do grupo."
+      });
+    } else {
+      toast({
+        title: "Erro ao aprovar",
+        description: "Não foi possível aprovar o usuário.",
+        variant: "destructive"
+      });
+    }
+    setProcessingId(null);
+  };
+
+  const handleReject = async (userId: string) => {
+    setProcessingId(userId);
+    const result = await rejectUser(userId);
+    if (result.success) {
+      toast({
+        title: "Solicitação rejeitada",
+        description: "A solicitação foi removida com sucesso."
+      });
+    } else {
+      toast({
+        title: "Erro ao rejeitar",
+        description: "Não foi possível rejeitar a solicitação.",
+        variant: "destructive"
+      });
+    }
+    setProcessingId(null);
   };
 
   if (pendingUsers.length === 0) {
@@ -62,10 +96,15 @@ const PendingMembers = ({ groupId }: PendingMembersProps) => {
               <DropdownMenuTrigger asChild>
                 <Button
                   size="sm"
+                  disabled={!!processingId}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold"
                 >
-                  <Check className="h-4 w-4 mr-1" />
-                  Aprovar como...
+                  {processingId === pendingUser.user_id ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  ) : (
+                    <Check className="h-4 w-4 mr-1" />
+                  )}
+                  Aceitar membro
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="rounded-xl">
@@ -87,10 +126,15 @@ const PendingMembers = ({ groupId }: PendingMembersProps) => {
             <Button
               size="sm"
               variant="outline"
+              disabled={!!processingId}
               className="text-red-600 border-red-200 hover:bg-red-50 rounded-xl font-bold"
-              onClick={() => rejectUser(pendingUser.user_id)}
+              onClick={() => handleReject(pendingUser.user_id)}
             >
-              <X className="h-4 w-4 mr-1" />
+              {processingId === pendingUser.user_id ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <X className="h-4 w-4 mr-1" />
+              )}
               Rejeitar
             </Button>
           </div>

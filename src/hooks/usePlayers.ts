@@ -23,7 +23,9 @@ export const usePlayers = (groupId?: string) => {
 
       if (error) throw error
 
-      const mappedPlayers: Player[] = data.map(player => ({
+      const mappedPlayers: Player[] = data
+        .filter(player => !player.type?.startsWith('claim:') && !player.type?.startsWith('request:'))
+        .map(player => ({
         id: player.id,
         name: player.name,
         type: player.type as PlayerType,
@@ -162,7 +164,9 @@ export const usePlayers = (groupId?: string) => {
 
         if (error) throw error
 
-        const mappedPlayers: Player[] = data.map(player => ({
+        const mappedPlayers: Player[] = data
+          .filter(player => !player.type?.startsWith('claim:') && !player.type?.startsWith('request:'))
+          .map(player => ({
           id: player.id,
           name: player.name,
           type: player.type as PlayerType,
@@ -231,7 +235,9 @@ export const usePlayers = (groupId?: string) => {
 
       if (error) throw error
 
-      const mappedPlayers: Player[] = data.map(player => ({
+      const mappedPlayers: Player[] = data
+        .filter(player => !player.type?.startsWith('claim:') && !player.type?.startsWith('request:'))
+        .map(player => ({
         id: player.id,
         name: player.name,
         type: player.type as PlayerType,

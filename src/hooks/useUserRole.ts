@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from './useAuth'
+import { toast } from '@/hooks/use-toast'
 import type { GroupSettings } from '@/types/football'
 
-export type AppRole = 'admin' | 'pending' | 'approved' | 'financeiro' | 'atleta'
+export type AppRole = 'admin' | 'pending' | 'approved' | 'financeiro' | 'atleta' | 'rejected'
 
 interface UserRole {
   id: string
@@ -40,104 +41,103 @@ export const useUserRole = (groupId?: string) => {
   const [loading, setLoading] = useState(true)
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([])
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([])
+  const [refreshingMembers, setRefreshingMembers] = useState(false)
 
-  useEffect(() => {
+  const fetchRole = useCallback(async () => {
     if (!user) {
       setRole(null)
       setLoading(false)
       return
     }
 
-    const fetchRole = async () => {
-      console.log('useUserRole: fetchRole starting', { userId: user.id, groupId });
-      try {
-        setLoading(true)
+    console.log('useUserRole: fetchRole starting', { userId: user.id, groupId });
+    try {
+      setLoading(true)
+      
+      // 1. Check if user is the owner of the group
+      if (groupId) {
+        const { data: groupData, error: groupError } = await supabase
+          .from('groups')
+          .select('owner_id, settings')
+          .eq('id', groupId)
+          .maybeSingle()
         
-        // 1. Check if user is the owner of the group
-        if (groupId) {
-          const { data: groupData, error: groupError } = await supabase
-            .from('groups')
-            .select('owner_id, settings')
-            .eq('id', groupId)
-            .maybeSingle()
-          
-          if (groupError) {
-            console.error('useUserRole: Error fetching group', groupError);
-          }
-
-          if (!groupError && groupData) {
-            console.log('useUserRole: Group data found', { 
-              ownerId: groupData.owner_id, 
-              userId: user.id,
-              isOwner: groupData.owner_id === user.id 
-            });
-            
-            if (groupData.owner_id === user.id) {
-              console.log('useUserRole: User is owner');
-              setRole('admin')
-              setLoading(false)
-              return
-            }
-
-            // 2. Check group-specific roles in settings
-            const settings = groupData.settings as unknown as GroupSettings
-            console.log('useUserRole: Checking settings roles', settings?.roles);
-            if (settings?.roles && settings.roles[user.id]) {
-              console.log('useUserRole: Role found in settings', settings.roles[user.id]);
-              setRole(settings.roles[user.id] as AppRole)
-              setLoading(false)
-              return
-            }
-
-            // 3. Check if user has a player record in this group (indicates a request or link)
-            const { data: playerData, error: playerError } = await supabase
-              .from('players')
-              .select('id, user_id')
-              .eq('group_id', groupId)
-              .eq('user_id', user.id)
-              .maybeSingle()
-            
-            if (!playerError && playerData) {
-              console.log('useUserRole: User has player record in group, setting role to pending');
-              // If they have a player but aren't in roles yet, they are pending
-              setRole('pending')
-              setLoading(false)
-              return
-            }
-          }
+        if (groupError) {
+          console.error('useUserRole: Error fetching group', groupError);
         }
 
-        // 4. Fallback to global role ONLY if not in a group context
-        // If we are in a group context and reached here, the user has NO role in this group
-        if (!groupId) {
-          const { data, error } = await supabase
-            .from('user_roles')
-            .select('*')
+        if (!groupError && groupData) {
+          console.log('useUserRole: Group data found', { 
+            ownerId: groupData.owner_id, 
+            userId: user.id,
+            isOwner: groupData.owner_id === user.id 
+          });
+          
+          if (groupData.owner_id === user.id) {
+            console.log('useUserRole: User is owner');
+            setRole('admin')
+            setLoading(false)
+            return
+          }
+
+          // 2. Check group-specific roles in settings
+          const settings = groupData.settings as unknown as GroupSettings
+          console.log('useUserRole: Checking settings roles', settings?.roles);
+          if (settings?.roles && settings.roles[user.id]) {
+            console.log('useUserRole: Role found in settings', settings.roles[user.id]);
+            setRole(settings.roles[user.id] as AppRole)
+            setLoading(false)
+            return
+          }
+
+          // 3. Check if user has a player record in this group (indicates a request or link)
+          const { data: playerData, error: playerError } = await supabase
+            .from('players')
+            .select('id, user_id')
+            .eq('group_id', groupId)
             .eq('user_id', user.id)
             .maybeSingle()
-
-          if (error) {
-            console.error('Error fetching role:', error)
-            setRole(null)
-          } else if (data) {
-            setRole(data.role as AppRole)
-          } else {
-            setRole(null)
+          
+          if (!playerError && playerData) {
+            console.log('useUserRole: User has player record in group, setting role to pending');
+            // If they have a player but aren't in roles yet, they are pending
+            setRole('pending')
+            setLoading(false)
+            return
           }
+        }
+      }
+
+      // 4. Fallback to global role ONLY if not in a group context
+      if (!groupId) {
+        const { data, error } = await supabase
+          .from('user_roles')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (error) {
+          console.error('Error fetching role:', error)
+          setRole(null)
+        } else if (data) {
+          setRole(data.role as AppRole)
         } else {
-          // In group context, if no role found yet, they are not a member
           setRole(null)
         }
-      } catch (error) {
-        console.error('Error fetching role:', error)
+      } else {
         setRole(null)
-      } finally {
-        setLoading(false)
       }
+    } catch (error) {
+      console.error('Error fetching role:', error)
+      setRole(null)
+    } finally {
+      setLoading(false)
     }
-
-    fetchRole()
   }, [user, groupId])
+
+  useEffect(() => {
+    fetchRole()
+  }, [fetchRole])
 
   const fetchPendingUsers = useCallback(async () => {
     const isActuallyAdmin = role === 'admin' || isSuperAdmin;
@@ -183,11 +183,25 @@ export const useUserRole = (groupId?: string) => {
 
       // 3. Combine UIDs from settings.roles and players table
       const pendingFromSettings = Object.keys(roles).filter(id => roles[id] === 'pending')
+      
+      console.log('fetchPendingUsers: Roles in settings', roles);
+      
       const pendingFromPlayers = playersWithUser
-        .filter(p => 
-          p.user_id !== groupData.owner_id && 
-          (!roles[p.user_id] || roles[p.user_id] === 'pending')
-        )
+        .filter(p => {
+          const userRole = roles[p.user_id];
+          const isOwner = p.user_id === groupData.owner_id;
+          const isRejected = userRole === 'rejected';
+          const isAlreadyMember = userRole && userRole !== 'pending' && userRole !== 'rejected';
+          
+          // A user is pending if:
+          // 1. They are not the owner
+          // 2. They are not explicitly rejected
+          // 3. They are not already a member (approved, admin, etc.)
+          // 4. They either have 'pending' role OR no role at all (but have a player record)
+          const isPending = !isOwner && !isRejected && !isAlreadyMember && (!userRole || userRole === 'pending');
+          
+          return isPending;
+        })
         .map(p => p.user_id)
 
       const allPendingUserIds = Array.from(new Set([...pendingFromSettings, ...pendingFromPlayers]))
@@ -260,11 +274,65 @@ export const useUserRole = (groupId?: string) => {
       setPendingUsers(pending)
     } catch (err) {
       console.error('fetchPendingUsers: Error', err)
-      toast.error('Erro ao buscar solicitações pendentes')
+      toast({
+        title: "Erro",
+        description: "Erro ao buscar solicitações pendentes",
+        variant: "destructive"
+      })
     } finally {
       setLoading(false)
     }
   }, [user, groupId, role, isSuperAdmin])
+
+  useEffect(() => {
+    if (!user || !groupId) return
+
+    console.log('useUserRole: Setting up real-time subscriptions for group', groupId);
+
+    // 1. Subscribe to group changes (roles, settings)
+    const groupChannel = supabase
+      .channel(`group_changes_${groupId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'groups',
+          filter: `id=eq.${groupId}`
+        },
+        (payload) => {
+          console.log('useUserRole: Group updated via realtime', payload);
+          fetchRole();
+          fetchPendingUsers();
+        }
+      )
+      .subscribe()
+
+    // 2. Subscribe to player changes (requests, links)
+    const playerChannel = supabase
+      .channel(`player_changes_${groupId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'players',
+          filter: `group_id=eq.${groupId}`
+        },
+        (payload) => {
+          console.log('useUserRole: Player table changed via realtime', payload);
+          fetchRole();
+          fetchPendingUsers();
+        }
+      )
+      .subscribe()
+
+    return () => {
+      console.log('useUserRole: Cleaning up subscriptions');
+      supabase.removeChannel(groupChannel)
+      supabase.removeChannel(playerChannel)
+    }
+  }, [user, groupId, fetchRole, fetchPendingUsers])
 
   const approveUser = async (userId: string, targetRole: AppRole = 'approved') => {
     const isActuallyAdmin = role === 'admin' || isSuperAdmin;
@@ -306,21 +374,29 @@ export const useUserRole = (groupId?: string) => {
             .update({ user_id: userId })
             .eq('id', playerId)
 
-          // If the user had a placeholder player record (used for the request), delete it
-          // but ONLY if it's not the same as the one we just linked
-          const { data: placeholderPlayer } = await supabase
+          // If the user had placeholder player records (used for the request), delete them
+          // but ONLY if they are not the same as the one we just linked
+          await supabase
+            .from('players')
+            .delete()
+            .eq('user_id', userId)
+            .eq('group_id', groupId)
+            .neq('id', playerId);
+        } else {
+          // If the user was a new request (no claim), convert their placeholder to a real player
+          const { data: requestPlayer } = await supabase
             .from('players')
             .select('id, type')
             .eq('user_id', userId)
             .eq('group_id', groupId)
-            .neq('id', playerId)
+            .eq('type', 'request:new')
             .maybeSingle();
-
-          if (placeholderPlayer) {
+          
+          if (requestPlayer) {
             await supabase
               .from('players')
-              .delete()
-              .eq('id', placeholderPlayer.id);
+              .update({ type: 'convidado' })
+              .eq('id', requestPlayer.id);
           }
         }
         
@@ -382,6 +458,7 @@ export const useUserRole = (groupId?: string) => {
     if (!groupId) return
 
     try {
+      setRefreshingMembers(true)
       const { data: groupData, error: groupError } = await supabase
         .from('groups')
         .select('settings, owner_id')
@@ -390,14 +467,24 @@ export const useUserRole = (groupId?: string) => {
       
       if (groupError) throw groupError
       
-      const settings = groupData.settings as unknown as GroupSettings
+      const settings = (groupData.settings || {}) as unknown as GroupSettings;
       const roles = settings?.roles || {}
-      const userIds = Object.keys(roles).filter(id => roles[id] !== 'pending')
+
+      console.log('fetchGroupMembers: Fetched group data', { 
+        ownerId: groupData.owner_id, 
+        hasSettings: !!groupData.settings,
+        hasPlayerLinks: !!settings.playerLinks,
+        rolesCount: Object.keys(roles).length
+      });
+      
+      const userIds = Object.keys(roles).filter(id => roles[id] !== 'pending' && roles[id] !== 'rejected')
       
       // Add owner if not in roles
       if (!userIds.includes(groupData.owner_id)) {
         userIds.push(groupData.owner_id)
       }
+
+      console.log('fetchGroupMembers: Final userIds to fetch profiles for', userIds);
 
       if (userIds.length === 0) {
         setGroupMembers([])
@@ -411,39 +498,38 @@ export const useUserRole = (groupId?: string) => {
 
       if (profilesError) throw profilesError
 
-      // Fetch linked players for these users in this group
-      const { data: linkedPlayers, error: linkedError } = await supabase
+      // Fetch ALL players in this group to resolve names for links
+      const { data: allGroupPlayers, error: playersError } = await supabase
         .from('players')
-        .select('id, name, user_id, updated_at')
-        .eq('group_id', groupId)
-        .not('user_id', 'is', null)
-        .order('updated_at', { ascending: false });
+        .select('id, name, user_id')
+        .eq('group_id', groupId);
       
-      if (linkedError) {
-        console.error('Error fetching linked players:', linkedError);
-      } else {
-        console.log(`Found ${linkedPlayers?.length || 0} linked players in group ${groupId}`);
+      if (playersError) {
+        console.error('Error fetching group players:', playersError);
       }
       
-      // Use a Map to store the first (most recent) player found for each user from players table
+      // Use a Map to store the link for each user
       const linkedMap = new Map<string, { id: string; name: string }>();
-      linkedPlayers?.forEach(p => {
-        if (p.user_id && !linkedMap.has(p.user_id)) {
-          linkedMap.set(p.user_id, { id: p.id, name: p.name });
-        }
-      });
-
-      // OVERRIDE with links from group settings (Master Link)
-      if (groupData?.settings) {
-        const settings = groupData.settings as unknown as GroupSettings;
-        if (settings.playerLinks) {
-          Object.entries(settings.playerLinks).forEach(([uId, pId]) => {
-            const player = linkedPlayers?.find(p => p.id === pId);
-            if (player) {
-              linkedMap.set(uId, { id: player.id, name: player.name });
-            }
-          });
-        }
+      
+      // MASTER LINK LOGIC:
+      // If settings.playerLinks exists, it is the EXCLUSIVE source of truth for this group.
+      // This prevents "ghost" links from appearing if the players table update failed due to RLS.
+      if (settings.playerLinks) {
+        console.log('fetchGroupMembers: Using playerLinks from settings (Master Mode)', settings.playerLinks);
+        Object.entries(settings.playerLinks).forEach(([uId, pId]) => {
+          const player = allGroupPlayers?.find(p => p.id === pId);
+          if (player) {
+            linkedMap.set(uId, { id: player.id, name: player.name });
+          }
+        });
+      } else {
+        // Legacy Mode: Fallback to players table if settings.playerLinks is not yet initialized
+        console.log('fetchGroupMembers: No playerLinks in settings, falling back to players table (Legacy Mode)');
+        allGroupPlayers?.forEach(p => {
+          if (p.user_id && !linkedMap.has(p.user_id)) {
+            linkedMap.set(p.user_id, { id: p.id, name: p.name });
+          }
+        });
       }
 
       const members: GroupMember[] = profilesData.map(p => ({
@@ -458,6 +544,13 @@ export const useUserRole = (groupId?: string) => {
       setGroupMembers(members)
     } catch (error) {
       console.error('Error fetching group members:', error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar a lista de membros.",
+        variant: "destructive"
+      })
+    } finally {
+      setRefreshingMembers(false)
     }
   }, [groupId])
 
@@ -465,56 +558,111 @@ export const useUserRole = (groupId?: string) => {
     const isActuallyAdmin = role === 'admin' || isSuperAdmin;
     if (!user || !isActuallyAdmin) {
       console.error('rejectUser: Not authorized', { role, isSuperAdmin });
+      toast({
+        title: "Não autorizado",
+        description: "Você não tem permissão para realizar esta ação.",
+        variant: "destructive"
+      });
       return { success: false, error: 'Não autorizado' };
     }
 
     try {
       if (groupId) {
-        console.log('rejectUser: Rejecting for group', { groupId, userId });
-        // Group-specific rejection
+        console.log('rejectUser: Starting rejection process', { groupId, userId });
+        
+        // 1. Fetch current group data
         const { data: groupData, error: groupError } = await supabase
           .from('groups')
           .select('settings')
           .eq('id', groupId)
           .single()
         
-        if (groupError) throw groupError
+        if (groupError) {
+          console.error('rejectUser: Error fetching group data', groupError);
+          throw groupError;
+        }
         
-        const settings = groupData.settings as unknown as GroupSettings
+        // 2. Update settings
+        const settings = (groupData.settings || {}) as unknown as GroupSettings
         const roles = { ...(settings?.roles || {}) }
-        delete roles[userId]
+        
+        // ALWAYS set to 'rejected' to prevent them from reappearing in the pending list
+        // if they still have a player record in the group.
+        roles[userId] = 'rejected' as AppRole
         
         const pendingLinks = { ...(settings?.pendingLinks || {}) }
         delete pendingLinks[userId]
         
+        const playerLinks = { ...(settings?.playerLinks || {}) }
+        delete playerLinks[userId]
+        
+        console.log('rejectUser: Updating group settings to rejected for user', userId);
+
         const { error: updateError } = await supabase
           .from('groups')
-          .update({ settings: { ...settings, roles, pendingLinks } })
+          .update({ 
+            settings: { 
+              ...settings, 
+              roles, 
+              pendingLinks,
+              playerLinks
+            } 
+          })
           .eq('id', groupId)
         
-        if (updateError) throw updateError
+        if (updateError) {
+          console.error('rejectUser: Error updating group settings', updateError);
+          throw updateError;
+        }
 
-        // Also delete the placeholder player record created for the request
-        await supabase
-          .from('players')
-          .delete()
-          .eq('group_id', groupId)
-          .eq('user_id', userId)
+        // 3. Handle player records (Best effort - don't let it fail the whole process)
+        try {
+          console.log('rejectUser: Cleaning up player records for user', userId);
+          
+          const { data: userPlayers } = await supabase
+            .from('players')
+            .select('id, type')
+            .eq('group_id', groupId)
+            .eq('user_id', userId);
 
-        console.log('rejectUser: Success');
+          if (userPlayers && userPlayers.length > 0) {
+            for (const p of userPlayers) {
+              if (p.type?.startsWith('claim:') || p.type?.startsWith('request:')) {
+                console.log('rejectUser: Deleting placeholder player', p.id);
+                await supabase.from('players').delete().eq('id', p.id);
+              } else {
+                console.log('rejectUser: Clearing user_id from real player', p.id);
+                await supabase.from('players').update({ user_id: null }).eq('id', p.id);
+              }
+            }
+          }
+        } catch (playerErr) {
+          console.warn('rejectUser: Player cleanup failed (likely RLS), but group removal succeeded', playerErr);
+        }
+
+        console.log('rejectUser: Rejection/Removal completed successfully');
       } else {
+        console.log('rejectUser: Global rejection (user_roles)');
         const { error } = await supabase
           .from('user_roles')
           .delete()
-          .eq('id', userId)
+          .eq('user_id', userId)
 
         if (error) throw error
       }
 
-      await fetchPendingUsers()
+      // Force immediate refresh
+      await fetchPendingUsers();
+      if (groupId) await fetchGroupMembers();
+
       return { success: true }
     } catch (error) {
       console.error('Error rejecting user:', error)
+      toast({
+        title: "Erro",
+        description: "Ocorreu um erro ao processar a solicitação.",
+        variant: "destructive"
+      });
       return { success: false, error }
     }
   }
@@ -523,8 +671,7 @@ export const useUserRole = (groupId?: string) => {
     if (!user || !groupId) return { success: false }
     console.log('requestAccess: Starting', { userId: user.id, groupId, playerId });
     try {
-      // 1. Create a player record for this user in the group
-      // This acts as the "Request" since the user can't update the groups table directly
+      // 1. Create/Update a player record for this user in the group
       const { data: existingPlayer, error: checkError } = await supabase
         .from('players')
         .select('id')
@@ -536,23 +683,27 @@ export const useUserRole = (groupId?: string) => {
 
       if (!existingPlayer) {
         console.log('requestAccess: Creating player record for request');
-        const { error: createError } = await supabase
+        await supabase
           .from('players')
           .insert({
             group_id: groupId,
             user_id: user.id,
             name: user.user_metadata?.name || user.email?.split('@')[0] || 'Novo Membro',
-            type: playerId ? `claim:${playerId}` : 'convidado'
+            type: playerId ? `claim:${playerId}` : 'request:new'
           })
-
-        if (createError) {
-          console.error('requestAccess: Error creating player request', createError);
-          // If this fails, we might still try to update the group settings 
-          // (though we know it likely fails for non-owners)
-        }
+      } else {
+        // If they already have a record (maybe from a previous rejected request), update it
+        console.log('requestAccess: Updating existing player record for request');
+        await supabase
+          .from('players')
+          .update({
+            type: playerId ? `claim:${playerId}` : 'request:new'
+          })
+          .eq('id', existingPlayer.id)
       }
 
       // 2. Try to update group settings (will only work if user is owner, but good to have)
+      // For non-owners, this will fail but we rely on the player record being picked up by fetchPendingUsers
       const { data: groupData, error: groupError } = await supabase
         .from('groups')
         .select('settings')
@@ -561,19 +712,15 @@ export const useUserRole = (groupId?: string) => {
       
       if (!groupError && groupData) {
         const settings = groupData.settings as unknown as GroupSettings
-        const roles = { ...(settings?.roles || {}), [user.id]: 'pending' }
+        const roles = { ...(settings?.roles || {}), [user.id]: 'pending' as AppRole }
         const pendingLinks = { ...(settings?.pendingLinks || {}), [user.id]: playerId }
         
         console.log('requestAccess: Updating group settings', { roles, pendingLinks });
         
-        const { error: updateError } = await supabase
+        await supabase
           .from('groups')
           .update({ settings: { ...settings, roles, pendingLinks } })
           .eq('id', groupId)
-        
-        if (updateError) {
-          console.log('requestAccess: Group update failed (expected for non-owners), relying on player record');
-        }
       }
       
       console.log('requestAccess: Success');
@@ -605,6 +752,7 @@ export const useUserRole = (groupId?: string) => {
     approveUser,
     rejectUser,
     updateUserRole,
-    requestAccess
+    requestAccess,
+    refreshingMembers
   }
 }
