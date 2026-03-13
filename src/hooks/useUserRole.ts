@@ -285,6 +285,7 @@ export const useUserRole = (groupId?: string) => {
     if (!user || !groupId) return
 
     console.log('useUserRole: Setting up real-time subscriptions for group', groupId);
+    fetchPendingUsers();
 
     // 1. Subscribe to group changes (roles, settings)
     const groupChannel = supabase
