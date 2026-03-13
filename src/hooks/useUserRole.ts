@@ -674,7 +674,7 @@ export const useUserRole = (groupId?: string) => {
 
       if (checkError) throw checkError
 
-      const requestType = playerId ? `claim:${playerId}` : 'convidado';
+      const requestType = playerId ? `claim:${playerId}` : 'request:new';
       const requestName = `Solicitação: ${user.user_metadata?.name || user.email?.split('@')[0] || 'Novo Membro'}`;
 
       if (!existingPlayer) {
