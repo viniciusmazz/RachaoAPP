@@ -4,18 +4,30 @@ import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
 import dotenv from "dotenv";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize Supabase with Service Role Key for backend operations
-const supabaseAdmin = createClient(
-  process.env.SUPABASE_URL || "",
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ""
-);
+// Lazy initialize Supabase Admin
+let supabaseAdminInstance: SupabaseClient | null = null;
+
+function getSupabaseAdmin() {
+  if (!supabaseAdminInstance) {
+    const url = process.env.SUPABASE_URL || "https://wnrfyhedlryufcwnvbma.supabase.co";
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    
+    if (!key) {
+      console.warn("SUPABASE_SERVICE_ROLE_KEY is missing. Backend operations will fail.");
+      return null;
+    }
+    
+    supabaseAdminInstance = createClient(url, key);
+  }
+  return supabaseAdminInstance;
+}
 
 async function startServer() {
   const app = express();
@@ -26,7 +38,11 @@ async function startServer() {
 
   // API Routes
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", message: "RachãoApp Backend is running" });
+    res.json({ 
+      status: "ok", 
+      message: "RachãoApp Backend is running",
+      cieloConfigured: !!(process.env.CIELO_MERCHANT_ID && process.env.CIELO_MERCHANT_KEY)
+    });
   });
 
   // Cielo Checkout Route
@@ -105,7 +121,109 @@ async function startServer() {
     }
   });
 
-  // Webhook for Cielo notifications
+  // Cielo API 3.0 - PIX Payment
+  app.post("/api/payments/pix", async (req, res) => {
+    try {
+      const { amount, paymentId, customerName } = req.body;
+      
+      const merchantId = process.env.CIELO_MERCHANT_ID;
+      const merchantKey = process.env.CIELO_MERCHANT_KEY;
+      const apiUrl = process.env.CIELO_API_URL || "https://apisandbox.cieloecommerce.cielo.com.br";
+
+      const amountInCents = Math.round(amount * 100);
+
+      const body = {
+        "MerchantOrderId": paymentId,
+        "Customer": {
+          "Name": customerName || "Jogador Rachão"
+        },
+        "Payment": {
+          "Type": "Pix",
+          "Amount": amountInCents
+        }
+      };
+
+      const response = await fetch(`${apiUrl}/1/sales`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "MerchantId": merchantId || "",
+          "MerchantKey": merchantKey || ""
+        },
+        body: JSON.stringify(body)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("Cielo PIX Error:", data);
+        return res.status(response.status).json({ success: false, error: data });
+      }
+
+      res.json({ 
+        success: true, 
+        qrCodeBase64: data.Payment.QrCodeBase64Image,
+        qrCodeString: data.Payment.QrCodeString,
+        paymentId: data.Payment.PaymentId
+      });
+    } catch (error) {
+      console.error("PIX creation error:", error);
+      res.status(500).json({ success: false, error: "Erro ao gerar PIX" });
+    }
+  });
+
+  // Cielo API 3.0 - Credit Card Payment
+  app.post("/api/payments/credit-card", async (req, res) => {
+    try {
+      const { amount, paymentId, customerName, cardToken, securityCode } = req.body;
+      
+      const merchantId = process.env.CIELO_MERCHANT_ID;
+      const merchantKey = process.env.CIELO_MERCHANT_KEY;
+      const apiUrl = process.env.CIELO_API_URL || "https://apisandbox.cieloecommerce.cielo.com.br";
+
+      const amountInCents = Math.round(amount * 100);
+
+      const body = {
+        "MerchantOrderId": paymentId,
+        "Customer": {
+          "Name": customerName
+        },
+        "Payment": {
+          "Type": "CreditCard",
+          "Amount": amountInCents,
+          "Installments": 1,
+          "CreditCard": {
+            "CardToken": cardToken,
+            "SecurityCode": securityCode,
+            "Brand": "Visa" // Brand should be detected or passed
+          }
+        }
+      };
+
+      const response = await fetch(`${apiUrl}/1/sales`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "MerchantId": merchantId || "",
+          "MerchantKey": merchantKey || ""
+        },
+        body: JSON.stringify(body)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return res.status(response.status).json({ success: false, error: data });
+      }
+
+      res.json({ success: true, data });
+    } catch (error) {
+      console.error("Credit Card error:", error);
+      res.status(500).json({ success: false, error: "Erro ao processar cartão" });
+    }
+  });
+
+  // Webhook for Cielo notifications (API 3.0)
   app.post("/api/payments/webhook", async (req, res) => {
     try {
       // Cielo Checkout sends notification as form-data or JSON depending on config
@@ -116,7 +234,13 @@ async function startServer() {
 
       // Status 2 = Paid/Approved in Cielo Checkout
       if (status === 2 || status === "2") {
-        const { error } = await supabaseAdmin
+        const admin = getSupabaseAdmin();
+        if (!admin) {
+          console.error("Cannot update payment: SUPABASE_SERVICE_ROLE_KEY is missing");
+          return res.status(500).send("Server Configuration Error");
+        }
+
+        const { error } = await admin
           .from("payments")
           .update({ 
             paid: true, 

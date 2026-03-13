@@ -59,9 +59,17 @@ export default function MatchHistory({ matches, players, onMatchUpdate, onMatchD
     players.find(p => p.id === id)?.photoUrl;
 
   const getMatchResult = (match: Match) => {
-    const azulGoals = match.events.filter(e => e.team === "azul").length;
-    const vermelhoGoals = match.events.filter(e => e.team === "vermelho").length;
-    return { azul: azulGoals, vermelho: vermelhoGoals };
+    const hasEvents = match.events && match.events.length > 0;
+    if (hasEvents) {
+      const azulGoals = match.events.filter(e => e.team === "azul").length;
+      const vermelhoGoals = match.events.filter(e => e.team === "vermelho").length;
+      return { azul: azulGoals, vermelho: vermelhoGoals };
+    }
+    const azul = (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+                 (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+    const vermelho = (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+                     (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+    return { azul, vermelho };
   };
 
   const handleViewReport = async (reportPath: string) => {
@@ -148,6 +156,29 @@ export default function MatchHistory({ matches, players, onMatchUpdate, onMatchD
     // Agrupar estatísticas a partir dos dados de teams (fonte correta)
     const getTeamStats = (team: typeof match.teams.azul, stat: 'goals' | 'assists' | 'ownGoals'): [string, number][] => {
       const grouped: Record<string, number> = {};
+      const hasEvents = match.events && match.events.length > 0;
+
+      if (hasEvents) {
+        match.events.forEach(e => {
+          if (stat === 'goals' && !e.isOwnGoal) {
+            grouped[e.scorerId] = (grouped[e.scorerId] || 0) + 1;
+          } else if (stat === 'assists' && e.assistId) {
+            grouped[e.assistId] = (grouped[e.assistId] || 0) + 1;
+          } else if (stat === 'ownGoals' && e.isOwnGoal) {
+            grouped[e.scorerId] = (grouped[e.scorerId] || 0) + 1;
+          }
+        });
+        // Filter only players that are in the requested team
+        const teamPlayerIds = new Set(team.map(t => t.playerId));
+        const filteredGrouped: Record<string, number> = {};
+        Object.entries(grouped).forEach(([pid, val]) => {
+          if (teamPlayerIds.has(pid)) {
+            filteredGrouped[pid] = val;
+          }
+        });
+        return Object.entries(filteredGrouped).sort((a, b) => b[1] - a[1]);
+      }
+
       team.forEach(t => {
         const value = t[stat] || 0;
         if (value > 0) {

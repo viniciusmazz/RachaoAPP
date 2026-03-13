@@ -40,11 +40,16 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
     };
 
     matches.forEach(match => {
-      // Calculate score from teams data (Manual Entry)
-      const golsAzul = (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
-                       (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
-      const golsVermelho = (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
-                           (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+      const hasEvents = match.events && match.events.length > 0;
+      // Calculate score
+      const golsAzul = hasEvents 
+        ? match.events.filter(e => e.team === 'azul').length
+        : (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+          (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+      const golsVermelho = hasEvents
+        ? match.events.filter(e => e.team === 'vermelho').length
+        : (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+          (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
       stats.azul.jogos++;
       stats.azul.golsPro += golsAzul;
@@ -99,11 +104,16 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
     };
 
     matches.forEach(match => {
-      // Calculate score from teams data (Manual Entry)
-      const golsAzul = (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
-                       (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
-      const golsVermelho = (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
-                           (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+      const hasEvents = match.events && match.events.length > 0;
+      // Calculate score
+      const golsAzul = hasEvents 
+        ? match.events.filter(e => e.team === 'azul').length
+        : (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+          (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+      const golsVermelho = hasEvents
+        ? match.events.filter(e => e.team === 'vermelho').length
+        : (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+          (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
       let azulResult: "v" | "e" | "d" = "e";
       let vermelhoResult: "v" | "e" | "d" = "e";
@@ -132,23 +142,43 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
       processTeam(match.teams.azul, azulResult, golsVermelho);
       processTeam(match.teams.vermelho, vermelhoResult, golsAzul);
 
-      // Count goals and assists from teams (Manual Entry)
-      match.teams.azul.forEach(p => {
-        if (!isMensalista(p.playerId)) return;
-        const s = ensure(p.playerId);
-        s.gols += p.goals || 0;
-        s.assistencias += p.assists || 0;
-        s.ownGoals += p.ownGoals || 0;
-        s.participacoes += (p.goals || 0) + (p.assists || 0);
-      });
-      match.teams.vermelho.forEach(p => {
-        if (!isMensalista(p.playerId)) return;
-        const s = ensure(p.playerId);
-        s.gols += p.goals || 0;
-        s.assistencias += p.assists || 0;
-        s.ownGoals += p.ownGoals || 0;
-        s.participacoes += (p.goals || 0) + (p.assists || 0);
-      });
+      // Count goals and assists
+      if (hasEvents) {
+        match.events.forEach(e => {
+          if (!isMensalista(e.scorerId)) return;
+          const s = ensure(e.scorerId);
+          if (e.isOwnGoal) {
+            s.ownGoals++;
+          } else {
+            s.gols++;
+            s.participacoes++;
+          }
+        });
+        match.events.forEach(e => {
+          if (e.assistId && isMensalista(e.assistId)) {
+            const s = ensure(e.assistId);
+            s.assistencias++;
+            s.participacoes++;
+          }
+        });
+      } else {
+        match.teams.azul.forEach(p => {
+          if (!isMensalista(p.playerId)) return;
+          const s = ensure(p.playerId);
+          s.gols += p.goals || 0;
+          s.assistencias += p.assists || 0;
+          s.ownGoals += p.ownGoals || 0;
+          s.participacoes += (p.goals || 0) + (p.assists || 0);
+        });
+        match.teams.vermelho.forEach(p => {
+          if (!isMensalista(p.playerId)) return;
+          const s = ensure(p.playerId);
+          s.gols += p.goals || 0;
+          s.assistencias += p.assists || 0;
+          s.ownGoals += p.ownGoals || 0;
+          s.participacoes += (p.goals || 0) + (p.assists || 0);
+        });
+      }
     });
 
     const entries = Array.from(stats.entries()).filter(([, s]) => s.jogos > 0);

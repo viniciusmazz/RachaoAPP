@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { toast } from '@/hooks/use-toast'
-import { Loader2, ArrowLeft, Camera, User, Phone, CreditCard, Mail, Trophy } from 'lucide-react'
+import { Loader2, ArrowLeft, Camera, User, Phone, CreditCard, Mail, Trophy, Zap } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import ConsolidatedStats from '@/components/player/ConsolidatedStats'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import PaymentTest from '@/components/payment/PaymentTest'
 
 const Profile = () => {
   const { user, loading: authLoading } = useAuth()
@@ -20,6 +21,7 @@ const Profile = () => {
   const [phone, setPhone] = useState('')
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [plan, setPlan] = useState('gratuito')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -28,6 +30,7 @@ const Profile = () => {
       setCpf(user.user_metadata?.cpf || '')
       setPhone(user.user_metadata?.phone || '')
       setPhotoUrl(user.user_metadata?.photo_url || null)
+      setPlan(user.user_metadata?.plan || 'gratuito')
     }
   }, [user])
 
@@ -40,7 +43,8 @@ const Profile = () => {
       data: {
         name,
         phone,
-        photo_url: photoUrl
+        photo_url: photoUrl,
+        plan
       }
     })
 
@@ -124,11 +128,11 @@ const Profile = () => {
       <div className="max-w-2xl mx-auto space-y-6">
         <Button 
           variant="ghost" 
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/painel')}
           className="rounded-full hover:bg-white shadow-sm border border-transparent hover:border-slate-100 transition-all gap-2"
         >
           <ArrowLeft className="h-4 w-4" />
-          Voltar para Home
+          Voltar para o Painel
         </Button>
 
         <Tabs defaultValue="perfil" className="w-full">
@@ -226,6 +230,36 @@ const Profile = () => {
                         disabled
                         className="h-12 rounded-2xl border-slate-200 bg-slate-100 cursor-not-allowed opacity-70"
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase tracking-widest text-slate-400 ml-1 flex items-center gap-2">
+                        <Zap className="h-3 w-3" /> Plano Atual
+                      </Label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {['gratuito', 'trio', 'liga'].map((p) => (
+                          <Button
+                            key={p}
+                            type="button"
+                            variant={plan === p ? "default" : "outline"}
+                            className={`rounded-xl h-12 font-bold uppercase text-[10px] tracking-wider transition-all ${
+                              plan === p ? "shadow-md shadow-primary/20" : "border-slate-200"
+                            }`}
+                            onClick={() => {
+                              if (p !== 'gratuito') {
+                                const message = encodeURIComponent(`Olá! Gostaria de solicitar o upgrade do meu plano para ${p.toUpperCase()} no RachãoApp.`);
+                                window.open(`https://wa.me/5544988270188?text=${message}`, '_blank');
+                              } else {
+                                setPlan(p);
+                              }
+                            }}
+                          >
+                            {p}
+                          </Button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-slate-400 italic mt-1 px-1">
+                        * Para upgrade/downgrade de planos pagos, entre em contato via WhatsApp.
+                      </p>
                     </div>
                   </div>
 

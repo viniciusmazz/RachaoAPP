@@ -69,7 +69,7 @@ const Admin = () => {
       if (!user) {
         navigate('/auth');
       } else if (!isSuperAdmin && !isSuperAdminCheck) {
-        navigate('/');
+        navigate('/painel');
         toast({
           title: "Acesso negado",
           description: `Apenas o administrador geral pode acessar esta página. Logado como: ${user.email}`,
@@ -371,11 +371,11 @@ const Admin = () => {
       <header className="mb-8">
         <Button 
           variant="ghost" 
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/painel')}
           className="mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Voltar
+          Voltar para o Painel
         </Button>
         <h1 className="text-3xl font-bold">Administração</h1>
         <p className="text-muted-foreground mt-2">Gerencie aprovações e níveis de acesso dos usuários</p>

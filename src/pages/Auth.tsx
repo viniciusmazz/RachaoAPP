@@ -66,8 +66,8 @@ const Auth = () => {
         }
         const session = sessionData?.session
         if (session?.user) {
-          console.log('User already logged in, redirecting to home')
-          navigate('/')
+          console.log('User already logged in, redirecting to painel')
+          navigate('/painel')
         }
       } catch (error) {
         console.error('Error checking auth session:', error)
@@ -112,7 +112,7 @@ const Auth = () => {
         title: "Cadastro realizado!",
         description: "Bem-vindo ao RachãoApp! Sua conta está pronta para uso."
       })
-      navigate('/')
+      navigate('/painel')
     }
     setLoading(false)
   }
@@ -133,7 +133,7 @@ const Auth = () => {
         variant: "destructive"
       })
     } else {
-      navigate('/')
+      navigate('/painel')
     }
     setLoading(false)
   }

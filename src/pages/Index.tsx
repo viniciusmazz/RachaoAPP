@@ -290,7 +290,7 @@ const Index = ({ group, refreshGroup }: IndexProps) => {
               />
             )}
             {user && (
-              <Button variant="outline" onClick={() => navigate('/')} className="rounded-xl border-slate-200 font-bold hover:bg-slate-100 transition-all">
+              <Button variant="outline" onClick={() => navigate('/painel')} className="rounded-xl border-slate-200 font-bold hover:bg-slate-100 transition-all">
                 Meus Grupos
               </Button>
             )}
@@ -500,6 +500,26 @@ const Index = ({ group, refreshGroup }: IndexProps) => {
           </Tabs>
         </main>
       )}
+
+      <footer className="mt-12 py-8 border-t border-slate-200">
+        <div className="container max-w-6xl flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-left">
+          <div className="space-y-1">
+            <p className="text-slate-900 font-black text-lg tracking-tighter">
+              Rachão<span className="text-primary">App</span>
+            </p>
+            <p className="text-slate-500 text-sm font-medium">
+              A plataforma completa para gestão do seu grupo de futebol.
+            </p>
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/')}
+            className="rounded-xl font-bold border-slate-200 hover:bg-primary hover:text-white hover:border-primary transition-all"
+          >
+            Conheça o RachãoApp
+          </Button>
+        </div>
+      </footer>
     </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import logoUrl from "/logo.png";
 import { useAppSettings } from "@/hooks/useAppSettings";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,7 @@ const PLANS = [
     features: ["Jogadores ilimitados", "Estatísticas completas", "Controle financeiro", "URL exclusiva"],
     cta: "Começar Grátis",
     highlight: false,
+    type: 'free'
   },
   { 
     name: "Trio", 
@@ -68,8 +70,9 @@ const PLANS = [
     period: "/mês", 
     groups: "Até 3 grupos", 
     features: ["Tudo do plano Grátis", "3 grupos simultâneos", "Suporte prioritário"],
-    cta: "Assinar Trio",
+    cta: "Solicitar Trio",
     highlight: true,
+    type: 'paid'
   },
   { 
     name: "Liga", 
@@ -77,13 +80,31 @@ const PLANS = [
     period: "/mês", 
     groups: "Até 5 grupos", 
     features: ["Tudo do plano Trio", "5 grupos simultâneos", "Relatórios avançados"],
-    cta: "Assinar Liga",
+    cta: "Solicitar Liga",
     highlight: false,
+    type: 'paid'
   },
 ];
 
+const WHATSAPP_NUMBER = "5544988270188";
+const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}`;
+
 const Landing = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+
+  const handlePlanAction = (plan: typeof PLANS[0]) => {
+    if (plan.type === 'paid') {
+      const message = encodeURIComponent(`Olá! Gostaria de solicitar a contratação do plano ${plan.name} do RachãoApp.`);
+      window.open(`${WHATSAPP_URL}?text=${message}`, '_blank');
+    } else {
+      if (user) {
+        navigate("/painel");
+      } else {
+        navigate("/auth");
+      }
+    }
+  };
 
   useEffect(() => {
     console.log("Landing Page Loaded - Logo URL:", logoUrl);
@@ -101,8 +122,16 @@ const Landing = () => {
             <span className="font-black text-xl tracking-tighter text-slate-900">Rachão<span className="text-primary">App</span></span>
           </div>
           <div className="flex gap-3">
-            <Button variant="ghost" className="font-bold rounded-full" onClick={() => navigate("/auth")}>Entrar</Button>
-            <Button className="font-bold rounded-full px-6 shadow-lg shadow-primary/20" onClick={() => navigate("/auth")}>Criar Conta</Button>
+            {authLoading ? (
+              <div className="w-24 h-10 bg-slate-100 animate-pulse rounded-full" />
+            ) : user ? (
+              <Button className="font-bold rounded-full px-6 shadow-lg shadow-primary/20" onClick={() => navigate("/painel")}>Painel</Button>
+            ) : (
+              <>
+                <Button variant="ghost" className="font-bold rounded-full" onClick={() => navigate("/auth")}>Entrar</Button>
+                <Button className="font-bold rounded-full px-6 shadow-lg shadow-primary/20" onClick={() => navigate("/auth")}>Criar Conta</Button>
+              </>
+            )}
           </div>
         </div>
       </nav>
@@ -126,10 +155,10 @@ const Landing = () => {
           Estatísticas, escalação inteligente, controle financeiro e URL exclusiva. Tudo o que seu grupo precisa em uma interface moderna e rápida.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <Button size="lg" onClick={() => navigate("/auth")} className="h-16 px-10 text-lg font-black rounded-2xl gap-3 shadow-2xl shadow-primary/30 hover:scale-105 transition-all">
-            Começar Agora Grátis <ChevronRight className="h-6 w-6" />
+          <Button size="lg" onClick={() => navigate(user ? "/painel" : "/auth")} className="h-16 px-10 text-lg font-black rounded-2xl gap-3 shadow-2xl shadow-primary/30 hover:scale-105 transition-all">
+            {user ? "Ir para o Painel" : "Começar Agora Grátis"} <ChevronRight className="h-6 w-6" />
           </Button>
-          <p className="text-sm text-slate-400 font-medium">Sem cartão de crédito necessário</p>
+          {!user && <p className="text-sm text-slate-400 font-medium">Sem cartão de crédito necessário</p>}
         </div>
       </section>
 
@@ -198,7 +227,7 @@ const Landing = () => {
                 <Button 
                   className={`w-full h-14 rounded-2xl font-black text-base transition-all ${plan.highlight ? "shadow-xl shadow-primary/30 hover:shadow-primary/50" : ""}`} 
                   variant={plan.highlight ? "default" : "outline"}
-                  onClick={() => navigate("/auth")}
+                  onClick={() => handlePlanAction(plan)}
                 >
                   {plan.cta}
                 </Button>

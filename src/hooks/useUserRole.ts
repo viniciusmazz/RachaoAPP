@@ -35,6 +35,7 @@ interface PendingUser {
 
 export const useUserRole = (groupId?: string) => {
   const { user } = useAuth()
+  const isSuperAdmin = user?.email ? user.email.toLowerCase().trim() === 'viniciusmazz@gmail.com' : false;
   const [role, setRole] = useState<AppRole | null>(null)
   const [loading, setLoading] = useState(true)
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([])
@@ -158,7 +159,7 @@ export const useUserRole = (groupId?: string) => {
       // 1. Get group settings for roles and pending links
       const { data: groupData, error: groupError } = await supabase
         .from('groups')
-        .select('settings')
+        .select('settings, owner_id')
         .eq('id', groupId)
         .single()
 
@@ -183,10 +184,14 @@ export const useUserRole = (groupId?: string) => {
       // 3. Combine UIDs from settings.roles and players table
       const pendingFromSettings = Object.keys(roles).filter(id => roles[id] === 'pending')
       const pendingFromPlayers = playersWithUser
-        .filter(p => !roles[p.user_id] || roles[p.user_id] === 'pending')
+        .filter(p => 
+          p.user_id !== groupData.owner_id && 
+          (!roles[p.user_id] || roles[p.user_id] === 'pending')
+        )
         .map(p => p.user_id)
 
       const allPendingUserIds = Array.from(new Set([...pendingFromSettings, ...pendingFromPlayers]))
+        .filter(id => id !== groupData.owner_id)
       
       console.log('fetchPendingUsers: All pending user IDs', allPendingUserIds);
 
@@ -530,7 +535,6 @@ export const useUserRole = (groupId?: string) => {
     }
   }
 
-  const isSuperAdmin = user?.email ? user.email.toLowerCase().trim() === 'viniciusmazz@gmail.com' : false;
   const isAdmin = role === 'admin' || isSuperAdmin
   const isFinanceiro = role === 'financeiro' || role === 'admin' || isSuperAdmin
   const isApproved = role === 'approved' || role === 'atleta' || role === 'financeiro' || role === 'admin' || isSuperAdmin

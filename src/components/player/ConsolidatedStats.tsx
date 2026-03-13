@@ -84,29 +84,28 @@ export default function ConsolidatedStats({ userId }: { userId: string }) {
         playersMap.set(p.group_id, groupPlayers);
       });
 
-      // For each group, determine the correct linked player(s)
+      // For each group, determine the correct linked player
       userGroups.forEach(group => {
-        const settings = group.settings as { roles?: Record<string, string>; playerLinks?: Record<string, string | string[]> } | null;
+        const settings = group.settings as { playerLinks?: Record<string, string | string[]> } | null;
         const playerLinks = settings?.playerLinks || {};
         const linkedIdFromSettings = playerLinks[userId];
         
-        let finalPlayerIds: string[] = [];
         const groupPlayers = playersMap.get(group.id) || [];
-
+        
+        // Priority 1: Master Link in group settings (explicit link)
         if (linkedIdFromSettings) {
-          if (Array.isArray(linkedIdFromSettings)) {
-            finalPlayerIds = linkedIdFromSettings;
-          } else if (typeof linkedIdFromSettings === 'string') {
-            finalPlayerIds = [linkedIdFromSettings];
+          const id = Array.isArray(linkedIdFromSettings) ? linkedIdFromSettings[0] : linkedIdFromSettings;
+          if (typeof id === 'string') {
+            playerIdsByGroup.set(group.id, [id]);
+            return;
           }
-        } else {
-          finalPlayerIds = groupPlayers
-            .filter(p => p.user_id === userId)
-            .map(p => p.id);
         }
 
-        if (finalPlayerIds.length > 0) {
-          playerIdsByGroup.set(group.id, finalPlayerIds);
+        // Priority 2: Direct user_id link in players table
+        const myPlayer = groupPlayers.find(p => p.user_id === userId);
+        if (myPlayer) {
+          playerIdsByGroup.set(group.id, [myPlayer.id]);
+          return;
         }
       });
 
@@ -130,6 +129,8 @@ export default function ConsolidatedStats({ userId }: { userId: string }) {
 
       // 5. Calculate stats per group
       const consolidated: GroupStats[] = Array.from(playerIdsByGroup.entries()).map(([groupId, playerIds]) => {
+        const myPlayerId = playerIds[0];
+        
         // Filter matches by group AND year (if not total)
         const groupMatches = (matchesData || [])
           .filter(m => {
@@ -146,33 +147,47 @@ export default function ConsolidatedStats({ userId }: { userId: string }) {
           if (processedMatchIds.has(match.id)) return;
           processedMatchIds.add(match.id);
 
-          // Calculate score from teams data (Manual Entry)
-          const azulGoals = (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
-                           (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
-          const vermelhoGoals = (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
-                               (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+          // Calculate score
+          const hasEvents = match.events && match.events.length > 0;
+          const azulGoals = hasEvents 
+            ? match.events.filter(e => e.team === 'azul').length
+            : (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+              (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+          const vermelhoGoals = hasEvents
+            ? match.events.filter(e => e.team === 'vermelho').length
+            : (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+              (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
-          const playerInAzul = (match.teams.azul || []).filter(t => playerIds.includes(t.playerId));
-          const playerInVermelho = (match.teams.vermelho || []).filter(t => playerIds.includes(t.playerId));
+          const playerInAzul = (match.teams.azul || []).find(t => t.playerId === myPlayerId);
+          const playerInVermelho = (match.teams.vermelho || []).find(t => t.playerId === myPlayerId);
 
-          if (playerInAzul.length > 0 || playerInVermelho.length > 0) {
+          if (playerInAzul || playerInVermelho) {
             jogos++;
             
-            // Sum goals and assists from teams data
-            playerInAzul.forEach(p => {
-              gols += p.goals || 0;
-              assistencias += p.assists || 0;
-            });
-            playerInVermelho.forEach(p => {
-              gols += p.goals || 0;
-              assistencias += p.assists || 0;
-            });
+            // Sum goals and assists
+            if (hasEvents) {
+              match.events.forEach(e => {
+                if (e.scorerId === myPlayerId && !e.isOwnGoal) {
+                  gols++;
+                }
+                if (e.assistId === myPlayerId) {
+                  assistencias++;
+                }
+              });
+            } else {
+              // Fallback to manual stats
+              const p = playerInAzul || playerInVermelho;
+              if (p) {
+                gols += p.goals || 0;
+                assistencias += p.assists || 0;
+              }
+            }
 
             const wonAzul = azulGoals > vermelhoGoals;
             const wonVermelho = vermelhoGoals > azulGoals;
             const isDraw = azulGoals === vermelhoGoals;
 
-            if ((playerInAzul.length > 0 && wonAzul) || (playerInVermelho.length > 0 && wonVermelho)) {
+            if ((playerInAzul && wonAzul) || (playerInVermelho && wonVermelho)) {
               vitorias++;
             } else if (isDraw) {
               empates++;
