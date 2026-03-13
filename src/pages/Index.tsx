@@ -299,9 +299,14 @@ const Index = ({ group, refreshGroup }: IndexProps) => {
               />
             )}
             {user && (
-              <Button variant="outline" onClick={() => navigate('/painel')} className="rounded-xl border-slate-200 font-bold hover:bg-slate-100 transition-all">
-                Meus Grupos
-              </Button>
+              <>
+                <Button variant="outline" onClick={() => navigate('/profile')} className="rounded-xl border-slate-200 font-bold hover:bg-slate-100 transition-all">
+                  Perfil
+                </Button>
+                <Button variant="outline" onClick={() => navigate('/painel')} className="rounded-xl border-slate-200 font-bold hover:bg-slate-100 transition-all">
+                  Meus Grupos
+                </Button>
+              </>
             )}
             {user ? (
               <Button variant="ghost" onClick={handleSignOut} className="rounded-xl font-bold text-slate-500 hover:text-red-500 hover:bg-red-50 transition-all">
