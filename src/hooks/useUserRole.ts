@@ -65,7 +65,12 @@ export const useUserRole = (groupId?: string) => {
           }
 
           if (!groupError && groupData) {
-            console.log('useUserRole: Group data found', { ownerId: groupData.owner_id, userId: user.id });
+            console.log('useUserRole: Group data found', { 
+              ownerId: groupData.owner_id, 
+              userId: user.id,
+              isOwner: groupData.owner_id === user.id 
+            });
+            
             if (groupData.owner_id === user.id) {
               console.log('useUserRole: User is owner');
               setRole('admin')
@@ -83,17 +88,18 @@ export const useUserRole = (groupId?: string) => {
               return
             }
 
-            // 3. Check if user is linked to a player in this group
+            // 3. Check if user has a player record in this group (indicates a request or link)
             const { data: playerData, error: playerError } = await supabase
               .from('players')
-              .select('id')
+              .select('id, user_id')
               .eq('group_id', groupId)
               .eq('user_id', user.id)
               .maybeSingle()
             
             if (!playerError && playerData) {
-              console.log('useUserRole: User linked to player, setting role to approved');
-              setRole('approved')
+              console.log('useUserRole: User has player record in group, setting role to pending');
+              // If they have a player but aren't in roles yet, they are pending
+              setRole('pending')
               setLoading(false)
               return
             }
@@ -136,121 +142,94 @@ export const useUserRole = (groupId?: string) => {
     const isActuallyAdmin = role === 'admin' || isSuperAdmin;
     console.log('fetchPendingUsers called', { userId: user?.id, role, isSuperAdmin, isActuallyAdmin, groupId });
     
-    if (!user || !isActuallyAdmin) {
-      console.log('fetchPendingUsers: Not authorized or no user', { user: !!user, isActuallyAdmin });
+    if (!user || !isActuallyAdmin || !groupId) {
+      console.log('fetchPendingUsers: Not authorized or no group', { 
+        user: !!user, 
+        isActuallyAdmin, 
+        groupId 
+      });
       return;
     }
 
     try {
-      if (groupId) {
-        console.log('fetchPendingUsers: Fetching for group', groupId);
-        // Group-specific pending users from settings
-        const { data: groupData, error: groupError } = await supabase
-          .from('groups')
-          .select('settings')
-          .eq('id', groupId)
-          .single()
-        
-        if (groupError) {
-          console.error('fetchPendingUsers: Error fetching group data', groupError);
-          throw groupError;
-        }
-        
-        const settings = groupData.settings as unknown as GroupSettings
-        const roles = settings?.roles || {}
-        const pendingLinks = settings?.pendingLinks || {}
-        const pendingUserIds = Object.keys(roles).filter(id => roles[id] === 'pending')
-        
-        console.log('fetchPendingUsers: Pending user IDs found', pendingUserIds);
+      setLoading(true)
+      console.log('fetchPendingUsers: Fetching group data for', groupId);
+      
+      // 1. Get group settings for roles and pending links
+      const { data: groupData, error: groupError } = await supabase
+        .from('groups')
+        .select('settings')
+        .eq('id', groupId)
+        .single()
 
-        if (pendingUserIds.length === 0) {
-          setPendingUsers([])
-          return
-        }
+      if (groupError) throw groupError
 
-        const { data: profilesData, error: profilesError } = await supabase
-          .from('profiles')
-          .select('user_id, email, name')
-          .in('user_id', pendingUserIds)
+      const settings = groupData.settings as unknown as GroupSettings
+      const roles = settings?.roles || {}
+      const pendingLinks = settings?.pendingLinks || {}
+      
+      // 2. Get all players in the group that have a user_id
+      // This catches users who created a player to request access
+      const { data: playersWithUser, error: playersError } = await supabase
+        .from('players')
+        .select('user_id, name, id')
+        .eq('group_id', groupId)
+        .not('user_id', 'is', null)
 
-        if (profilesError) {
-          console.error('fetchPendingUsers: Error fetching profiles', profilesError);
-          // Don't throw, just proceed with what we have
-        }
+      if (playersError) throw playersError
 
-        console.log('fetchPendingUsers: Profiles fetched', profilesData?.length || 0);
+      console.log('fetchPendingUsers: Found players with user_id', playersWithUser);
 
-        // Fetch players to get names for claimed_player_id
-        const claimedPlayerIds = Object.values(pendingLinks).filter(id => !!id) as string[]
-        let playersMap = new Map<string, string>()
-        
-        if (claimedPlayerIds.length > 0) {
-          const { data: playersData } = await supabase
-            .from('players')
-            .select('id, name')
-            .in('id', claimedPlayerIds)
-          
-          playersMap = new Map(playersData?.map(p => [p.id, p.name]) || [])
-        }
+      // 3. Combine UIDs from settings.roles and players table
+      const pendingFromSettings = Object.keys(roles).filter(id => roles[id] === 'pending')
+      const pendingFromPlayers = playersWithUser
+        .filter(p => !roles[p.user_id] || roles[p.user_id] === 'pending')
+        .map(p => p.user_id)
 
-        const profilesMap = new Map(profilesData?.map(p => [p.user_id, p]) || [])
+      const allPendingUserIds = Array.from(new Set([...pendingFromSettings, ...pendingFromPlayers]))
+      
+      console.log('fetchPendingUsers: All pending user IDs', allPendingUserIds);
 
-        const pending: PendingUser[] = pendingUserIds.map(uId => {
-          const p = profilesMap.get(uId);
-          return {
-            id: uId,
-            user_id: uId,
-            role: 'pending',
-            created_at: new Date().toISOString(),
-            email: p?.email || 'Email não disponível',
-            name: p?.name || null,
-            claimed_player_id: pendingLinks[uId],
-            claimed_player_name: pendingLinks[uId] ? playersMap.get(pendingLinks[uId]) : undefined
-          }
-        })
-
-        console.log('fetchPendingUsers: Final pending list', pending.length);
-        setPendingUsers(pending)
-      } else {
-        // Global pending users (legacy)
-        const { data: rolesData, error: rolesError } = await supabase
-          .from('user_roles')
-          .select('id, user_id, role, created_at')
-          .eq('role', 'pending')
-          .order('created_at', { ascending: false })
-
-        if (rolesError) throw rolesError
-
-        if (!rolesData || rolesData.length === 0) {
-          setPendingUsers([])
-          return
-        }
-
-        const userIds = rolesData.map(r => r.user_id)
-        const { data: profilesData, error: profilesError } = await supabase
-          .from('profiles')
-          .select('user_id, email, name')
-          .in('user_id', userIds)
-
-        if (profilesError) throw profilesError
-
-        const profilesMap = new Map(profilesData?.map(p => [p.user_id, p]) || [])
-
-        const pending: PendingUser[] = rolesData.map(r => ({
-          id: r.id,
-          user_id: r.user_id,
-          role: r.role as AppRole,
-          created_at: r.created_at,
-          email: profilesMap.get(r.user_id)?.email || 'Email não encontrado',
-          name: profilesMap.get(r.user_id)?.name || null
-        }))
-
-        setPendingUsers(pending)
+      if (allPendingUserIds.length === 0) {
+        setPendingUsers([])
+        setLoading(false)
+        return
       }
-    } catch (error) {
-      console.error('Error fetching pending users:', error)
+
+      // 4. Fetch profiles for all pending users
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, email, name')
+        .in('user_id', allPendingUserIds)
+
+      if (profilesError) throw profilesError
+
+      // 5. Map to PendingUser objects
+      const pending: PendingUser[] = allPendingUserIds.map(userId => {
+        const profile = profilesData?.find(p => p.user_id === userId)
+        const playerLink = playersWithUser?.find(p => p.user_id === userId)
+        
+        return {
+          id: userId,
+          user_id: userId,
+          role: 'pending',
+          created_at: new Date().toISOString(),
+          email: profile?.email || 'N/A',
+          name: profile?.name || playerLink?.name || 'Usuário',
+          claimed_player_id: pendingLinks[userId] || playerLink?.id,
+          claimed_player_name: playerLink?.name
+        }
+      })
+
+      console.log('fetchPendingUsers: Final pending list', pending);
+      setPendingUsers(pending)
+    } catch (err) {
+      console.error('fetchPendingUsers: Error', err)
+      toast.error('Erro ao buscar solicitações pendentes')
+    } finally {
+      setLoading(false)
     }
-  }, [user, role, groupId])
+  }, [user, groupId, role, isSuperAdmin])
 
   const approveUser = async (userId: string, targetRole: AppRole = 'approved') => {
     const isActuallyAdmin = role === 'admin' || isSuperAdmin;
@@ -459,6 +438,14 @@ export const useUserRole = (groupId?: string) => {
           .eq('id', groupId)
         
         if (updateError) throw updateError
+
+        // Also unset user_id in players table so they can request again
+        await supabase
+          .from('players')
+          .update({ user_id: null })
+          .eq('group_id', groupId)
+          .eq('user_id', userId)
+
         console.log('rejectUser: Success');
       } else {
         const { error } = await supabase
@@ -481,31 +468,57 @@ export const useUserRole = (groupId?: string) => {
     if (!user || !groupId) return { success: false }
     console.log('requestAccess: Starting', { userId: user.id, groupId, playerId });
     try {
+      // 1. Create a player record for this user in the group
+      // This acts as the "Request" since the user can't update the groups table directly
+      const { data: existingPlayer, error: checkError } = await supabase
+        .from('players')
+        .select('id')
+        .eq('group_id', groupId)
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (checkError) throw checkError
+
+      if (!existingPlayer) {
+        console.log('requestAccess: Creating player record for request');
+        const { error: createError } = await supabase
+          .from('players')
+          .insert({
+            group_id: groupId,
+            user_id: user.id,
+            name: user.user_metadata?.name || user.email?.split('@')[0] || 'Novo Membro',
+            type: 'convidado'
+          })
+
+        if (createError) {
+          console.error('requestAccess: Error creating player request', createError);
+          // If this fails, we might still try to update the group settings 
+          // (though we know it likely fails for non-owners)
+        }
+      }
+
+      // 2. Try to update group settings (will only work if user is owner, but good to have)
       const { data: groupData, error: groupError } = await supabase
         .from('groups')
         .select('settings')
         .eq('id', groupId)
         .single()
       
-      if (groupError) {
-        console.error('requestAccess: Error fetching group', groupError);
-        throw groupError
-      }
-      
-      const settings = groupData.settings as unknown as GroupSettings
-      const roles = { ...(settings?.roles || {}), [user.id]: 'pending' }
-      const pendingLinks = { ...(settings?.pendingLinks || {}), [user.id]: playerId }
-      
-      console.log('requestAccess: Updating group settings', { roles, pendingLinks });
-      
-      const { error: updateError } = await supabase
-        .from('groups')
-        .update({ settings: { ...settings, roles, pendingLinks } })
-        .eq('id', groupId)
-      
-      if (updateError) {
-        console.error('requestAccess: Error updating group', updateError);
-        throw updateError
+      if (!groupError && groupData) {
+        const settings = groupData.settings as unknown as GroupSettings
+        const roles = { ...(settings?.roles || {}), [user.id]: 'pending' }
+        const pendingLinks = { ...(settings?.pendingLinks || {}), [user.id]: playerId }
+        
+        console.log('requestAccess: Updating group settings', { roles, pendingLinks });
+        
+        const { error: updateError } = await supabase
+          .from('groups')
+          .update({ settings: { ...settings, roles, pendingLinks } })
+          .eq('id', groupId)
+        
+        if (updateError) {
+          console.log('requestAccess: Group update failed (expected for non-owners), relying on player record');
+        }
       }
       
       console.log('requestAccess: Success');
