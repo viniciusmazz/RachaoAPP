@@ -24,7 +24,7 @@ export const usePlayers = (groupId?: string) => {
       if (error) throw error
 
       const mappedPlayers: Player[] = data
-        .filter(player => !player.type?.startsWith('claim:') && !player.type?.startsWith('request:'))
+        .filter(player => !player.name?.startsWith('Solicitação:'))
         .map(player => ({
         id: player.id,
         name: player.name,
@@ -165,7 +165,7 @@ export const usePlayers = (groupId?: string) => {
         if (error) throw error
 
         const mappedPlayers: Player[] = data
-          .filter(player => !player.type?.startsWith('claim:') && !player.type?.startsWith('request:'))
+          .filter(player => !player.name?.startsWith('Solicitação:'))
           .map(player => ({
           id: player.id,
           name: player.name,
@@ -236,7 +236,7 @@ export const usePlayers = (groupId?: string) => {
       if (error) throw error
 
       const mappedPlayers: Player[] = data
-        .filter(player => !player.type?.startsWith('claim:') && !player.type?.startsWith('request:'))
+        .filter(player => !player.name?.startsWith('Solicitação:'))
         .map(player => ({
         id: player.id,
         name: player.name,

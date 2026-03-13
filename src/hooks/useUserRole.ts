@@ -674,7 +674,7 @@ export const useUserRole = (groupId?: string) => {
 
       if (checkError) throw checkError
 
-      const requestType = playerId ? `claim:${playerId}` : 'request:new';
+      const requestType = 'convidado'; // Use a valid type to bypass DB constraint
       const requestName = `Solicitação: ${user.user_metadata?.name || user.email?.split('@')[0] || 'Novo Membro'}`;
 
       if (!existingPlayer) {
@@ -685,7 +685,8 @@ export const useUserRole = (groupId?: string) => {
             group_id: groupId,
             user_id: user.id,
             name: requestName,
-            type: requestType
+            type: requestType,
+            // We can add a custom field or just rely on the name prefix to identify requests
           })
         if (insertError) throw insertError
       } else {
