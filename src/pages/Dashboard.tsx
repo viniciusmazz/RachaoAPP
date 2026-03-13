@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LogOut, Plus, Users, ExternalLink, Shield, Search, User } from "lucide-react";
+import { LogOut, Plus, Users, ExternalLink, Shield, Search, User, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Group } from "@/types/football";
@@ -201,13 +201,16 @@ const Dashboard = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
+              {searching && (
+                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                </div>
+              )}
             </div>
             {searchQuery.length >= 3 && (
               <Card className="rounded-3xl border-slate-100 shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2">
                 <CardContent className="p-4">
-                  {searching ? (
-                    <div className="py-8 text-center text-muted-foreground">Buscando...</div>
-                  ) : searchResults.length === 0 ? (
+                  {searchResults.length === 0 && !searching ? (
                     <div className="py-8 text-center text-muted-foreground">Nenhum grupo encontrado com esse nome.</div>
                   ) : (
                     <div className="grid gap-2">
