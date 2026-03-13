@@ -230,13 +230,11 @@ export const useUserRole = (groupId?: string) => {
         
         // Check if this player record is a claim for another player
         const isClaim = playerLink?.type?.startsWith('claim:');
-        const claimedPlayerId = isClaim ? playerLink.type.split(':')[1] : (pendingLinks[userId] || playerLink?.id);
+        const isNewRequest = playerLink?.type === 'request:new';
         
-        // If it's a claim, we might want to find the name of the claimed player
-        // But for now, we'll use the name from the placeholder record if it's not a claim
-        // or we'd need to fetch all players to find the name of the claimed one.
-        // Let's just use the name from the player record created for the request for now,
-        // or improve this by fetching the claimed player's name.
+        // If it's a claim, the ID is in the type string. 
+        // If it's a new request, there is NO claimed player ID (the playerLink is just a placeholder)
+        const claimedPlayerId = isClaim ? playerLink.type.split(':')[1] : (pendingLinks[userId] || null);
         
         return {
           id: userId,
@@ -244,9 +242,9 @@ export const useUserRole = (groupId?: string) => {
           role: 'pending',
           created_at: new Date().toISOString(),
           email: profile?.email || 'N/A',
-          name: profile?.name || playerLink?.name || 'Usuário',
+          name: profile?.name || profile?.email?.split('@')[0] || 'Usuário',
           claimed_player_id: claimedPlayerId,
-          claimed_player_name: isClaim ? undefined : playerLink?.name // We'll fix the name in the next step
+          claimed_player_name: undefined // Will be fetched next
         }
       })
 
@@ -383,21 +381,15 @@ export const useUserRole = (groupId?: string) => {
             .eq('group_id', groupId)
             .neq('id', playerId);
         } else {
-          // If the user was a new request (no claim), convert their placeholder to a real player
-          const { data: requestPlayer } = await supabase
+          // If the user was a new request (no claim), delete their placeholder
+          // They will be approved but without a linked player
+          console.log('approveUser: New request without claim, deleting placeholder');
+          await supabase
             .from('players')
-            .select('id, type')
+            .delete()
             .eq('user_id', userId)
             .eq('group_id', groupId)
-            .eq('type', 'request:new')
-            .maybeSingle();
-          
-          if (requestPlayer) {
-            await supabase
-              .from('players')
-              .update({ type: 'convidado' })
-              .eq('id', requestPlayer.id);
-          }
+            .eq('type', 'request:new');
         }
         
         const { error: updateError } = await supabase
@@ -688,7 +680,7 @@ export const useUserRole = (groupId?: string) => {
           .insert({
             group_id: groupId,
             user_id: user.id,
-            name: user.user_metadata?.name || user.email?.split('@')[0] || 'Novo Membro',
+            name: `Solicitação: ${user.user_metadata?.name || user.email?.split('@')[0] || 'Novo Membro'}`,
             type: playerId ? `claim:${playerId}` : 'request:new'
           })
       } else {
@@ -697,6 +689,7 @@ export const useUserRole = (groupId?: string) => {
         await supabase
           .from('players')
           .update({
+            name: `Solicitação: ${user.user_metadata?.name || user.email?.split('@')[0] || 'Novo Membro'}`,
             type: playerId ? `claim:${playerId}` : 'request:new'
           })
           .eq('id', existingPlayer.id)

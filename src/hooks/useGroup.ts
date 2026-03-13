@@ -160,7 +160,14 @@ export const useUserGroups = () => {
       const allGroups = [...(ownedGroups || []).map(mapGroup), ...memberGroups]
       const uniqueGroups = Array.from(new Map(allGroups.map(g => [g.id, g])).values())
       
-      setGroups(uniqueGroups.sort((a, b) => 
+      // Filter out groups where the user is explicitly rejected
+      const filteredGroups = uniqueGroups.filter(g => {
+        if (g.ownerId === session.user.id) return true;
+        const userRole = g.settings.roles?.[session.user.id];
+        return userRole !== 'rejected';
+      });
+
+      setGroups(filteredGroups.sort((a, b) => 
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       ))
     } catch (error) {

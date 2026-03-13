@@ -285,7 +285,11 @@ const Index = ({ group, refreshGroup }: IndexProps) => {
             {!isApproved && !isPending && user && (
               <JoinGroupDialog 
                 players={players.filter(p => {
-                  const isLinkedInTable = !!p.userId;
+                  // A player is considered "linked" in the table only if the user they are linked to 
+                  // is still a member or pending. If the user was rejected, the link is stale.
+                  const linkedUserRole = p.userId ? group.settings.roles?.[p.userId] : null;
+                  const isLinkedInTable = !!p.userId && linkedUserRole !== 'rejected';
+                  
                   const isLinkedInSettings = Object.values(group.settings.playerLinks || {}).includes(p.id);
                   const isPendingLink = Object.values(group.settings.pendingLinks || {}).includes(p.id);
                   return !isLinkedInTable && !isLinkedInSettings && !isPendingLink;
@@ -320,19 +324,29 @@ const Index = ({ group, refreshGroup }: IndexProps) => {
               <Shield className="h-10 w-10 text-slate-400" />
             </div>
             <div className="max-w-md mx-auto space-y-2">
-              <h2 className="text-2xl font-black tracking-tight text-slate-900">Grupo Privado</h2>
-              <p className="text-slate-500 font-medium">Este grupo é privado. Você precisa solicitar acesso para visualizar as informações.</p>
+              <h2 className="text-2xl font-black tracking-tight text-slate-900">
+                {role === 'rejected' ? "Acesso Recusado" : "Grupo Privado"}
+              </h2>
+              <p className="text-slate-500 font-medium">
+                {role === 'rejected' 
+                  ? "Sua solicitação de acesso foi recusada pelo administrador. Você pode tentar solicitar novamente se desejar."
+                  : "Este grupo é privado. Você precisa solicitar acesso para visualizar as informações."}
+              </p>
             </div>
             {!user ? (
               <Button onClick={() => navigate('/auth')} className="rounded-xl font-bold h-12 px-8">Fazer Login para Solicitar</Button>
             ) : (
-              <Button 
-                onClick={handleRequestAccess} 
-                disabled={requestingAccess}
-                className="rounded-xl font-bold h-12 px-8 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90"
-              >
-                {requestingAccess ? "Solicitando..." : "Solicitar Acesso"}
-              </Button>
+              <JoinGroupDialog 
+                players={players.filter(p => {
+                  const linkedUserRole = p.userId ? group.settings.roles?.[p.userId] : null;
+                  const isLinkedInTable = !!p.userId && linkedUserRole !== 'rejected';
+                  const isLinkedInSettings = Object.values(group.settings.playerLinks || {}).includes(p.id);
+                  const isPendingLink = Object.values(group.settings.pendingLinks || {}).includes(p.id);
+                  return !isLinkedInTable && !isLinkedInSettings && !isPendingLink;
+                })}
+                onRequestAccess={handleRequestAccess}
+                isPending={isPending}
+              />
             )}
           </main>
         ) : (
