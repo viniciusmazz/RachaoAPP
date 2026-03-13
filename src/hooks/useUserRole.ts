@@ -664,6 +664,7 @@ export const useUserRole = (groupId?: string) => {
     try {
       // 1. Create/Update a player record for this user in the group
       // This record acts as the "request" itself.
+      console.log('requestAccess: Fetching existing player', { groupId, userId: user.id });
       const { data: existingPlayer, error: checkError } = await supabase
         .from('players')
         .select('id, type, name')
@@ -671,12 +672,17 @@ export const useUserRole = (groupId?: string) => {
         .eq('user_id', user.id)
         .maybeSingle()
 
-      if (checkError) throw checkError
+      if (checkError) {
+        console.error('requestAccess: Error checking existing player', checkError);
+        throw checkError
+      }
+      console.log('requestAccess: Existing player found', existingPlayer);
 
       const requestType = 'convidado'; 
       const requestName = `Solicitação: ${user.user_metadata?.name || user.email?.split('@')[0] || 'Novo Membro'}`;
 
       if (!existingPlayer) {
+        console.log('requestAccess: Creating new player record', { groupId, userId: user.id, requestName, requestType });
         const { error: insertError } = await supabase
           .from('players')
           .insert({
@@ -685,9 +691,13 @@ export const useUserRole = (groupId?: string) => {
             name: requestName,
             type: requestType,
           })
-        if (insertError) throw insertError
+        if (insertError) {
+          console.error('requestAccess: Insert error', insertError);
+          throw insertError
+        }
+        console.log('requestAccess: Player record created successfully');
       } else {
-        // If they already have a record, update it to the new request type
+        console.log('requestAccess: Updating existing player record', existingPlayer.id);
         const { error: updateError } = await supabase
           .from('players')
           .update({
@@ -695,7 +705,11 @@ export const useUserRole = (groupId?: string) => {
             type: requestType
           })
           .eq('id', existingPlayer.id)
-        if (updateError) throw updateError
+        if (updateError) {
+          console.error('requestAccess: Update error', updateError);
+          throw updateError
+        }
+        console.log('requestAccess: Player record updated successfully');
       }
 
       // Note: We NO LONGER try to update the groups table here because 
@@ -703,7 +717,7 @@ export const useUserRole = (groupId?: string) => {
       // The admin will see the request by scanning the players table.
       
       console.log('requestAccess: Success');
-      setRole('pending')
+      setRole('pending');
       return { success: true }
     } catch (error) {
       console.error('Error requesting access:', error)
