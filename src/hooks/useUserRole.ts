@@ -173,7 +173,7 @@ export const useUserRole = (groupId?: string) => {
       // This catches users who created a player to request access
       const { data: playersWithUser, error: playersError } = await supabase
         .from('players')
-        .select('user_id, name, id')
+        .select('user_id, name, id, type')
         .eq('group_id', groupId)
         .not('user_id', 'is', null)
 
@@ -214,6 +214,16 @@ export const useUserRole = (groupId?: string) => {
         const profile = profilesData?.find(p => p.user_id === userId)
         const playerLink = playersWithUser?.find(p => p.user_id === userId)
         
+        // Check if this player record is a claim for another player
+        const isClaim = playerLink?.type?.startsWith('claim:');
+        const claimedPlayerId = isClaim ? playerLink.type.split(':')[1] : (pendingLinks[userId] || playerLink?.id);
+        
+        // If it's a claim, we might want to find the name of the claimed player
+        // But for now, we'll use the name from the placeholder record if it's not a claim
+        // or we'd need to fetch all players to find the name of the claimed one.
+        // Let's just use the name from the player record created for the request for now,
+        // or improve this by fetching the claimed player's name.
+        
         return {
           id: userId,
           user_id: userId,
@@ -221,10 +231,30 @@ export const useUserRole = (groupId?: string) => {
           created_at: new Date().toISOString(),
           email: profile?.email || 'N/A',
           name: profile?.name || playerLink?.name || 'Usuário',
-          claimed_player_id: pendingLinks[userId] || playerLink?.id,
-          claimed_player_name: playerLink?.name
+          claimed_player_id: claimedPlayerId,
+          claimed_player_name: isClaim ? undefined : playerLink?.name // We'll fix the name in the next step
         }
       })
+
+      // 6. Fetch names for claimed players if needed
+      const claimedIds = pending.map(p => p.claimed_player_id).filter(Boolean) as string[];
+      if (claimedIds.length > 0) {
+        const { data: claimedPlayersData } = await supabase
+          .from('players')
+          .select('id, name')
+          .in('id', claimedIds);
+        
+        if (claimedPlayersData) {
+          pending.forEach(p => {
+            if (p.claimed_player_id) {
+              const cp = claimedPlayersData.find(cp => cp.id === p.claimed_player_id);
+              if (cp) {
+                p.claimed_player_name = cp.name;
+              }
+            }
+          });
+        }
+      }
 
       console.log('fetchPendingUsers: Final pending list', pending);
       setPendingUsers(pending)
@@ -261,7 +291,10 @@ export const useUserRole = (groupId?: string) => {
         // Handle pending link if it exists
         const playerLinks = { ...(settings?.playerLinks || {}) }
         const pendingLinks = { ...(settings?.pendingLinks || {}) }
-        const playerId = pendingLinks[userId]
+        
+        // Find the claimed player ID for this user
+        const pendingUser = pendingUsers.find(u => u.user_id === userId);
+        const playerId = pendingLinks[userId] || pendingUser?.claimed_player_id;
         
         if (playerId) {
           playerLinks[userId] = playerId
@@ -272,6 +305,23 @@ export const useUserRole = (groupId?: string) => {
             .from('players')
             .update({ user_id: userId })
             .eq('id', playerId)
+
+          // If the user had a placeholder player record (used for the request), delete it
+          // but ONLY if it's not the same as the one we just linked
+          const { data: placeholderPlayer } = await supabase
+            .from('players')
+            .select('id, type')
+            .eq('user_id', userId)
+            .eq('group_id', groupId)
+            .neq('id', playerId)
+            .maybeSingle();
+
+          if (placeholderPlayer) {
+            await supabase
+              .from('players')
+              .delete()
+              .eq('id', placeholderPlayer.id);
+          }
         }
         
         const { error: updateError } = await supabase
@@ -444,10 +494,10 @@ export const useUserRole = (groupId?: string) => {
         
         if (updateError) throw updateError
 
-        // Also unset user_id in players table so they can request again
+        // Also delete the placeholder player record created for the request
         await supabase
           .from('players')
-          .update({ user_id: null })
+          .delete()
           .eq('group_id', groupId)
           .eq('user_id', userId)
 
@@ -492,7 +542,7 @@ export const useUserRole = (groupId?: string) => {
             group_id: groupId,
             user_id: user.id,
             name: user.user_metadata?.name || user.email?.split('@')[0] || 'Novo Membro',
-            type: 'convidado'
+            type: playerId ? `claim:${playerId}` : 'convidado'
           })
 
         if (createError) {
