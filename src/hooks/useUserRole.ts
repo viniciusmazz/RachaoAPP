@@ -674,7 +674,7 @@ export const useUserRole = (groupId?: string) => {
 
       if (checkError) throw checkError
 
-      const requestType = 'convidado'; // Use a valid type to bypass DB constraint
+      const requestType = playerId ? `claim:${playerId}` : 'convidado';
       const requestName = `Solicitação: ${user.user_metadata?.name || user.email?.split('@')[0] || 'Novo Membro'}`;
 
       if (!existingPlayer) {
