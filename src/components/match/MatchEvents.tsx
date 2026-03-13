@@ -207,41 +207,46 @@ export default function MatchEvents({ players, teams, events, onEventsChange, gr
           )}
           <ul className="space-y-2">
             {events.map((e) => (
-              <li key={e.id} className="rounded-md border p-2 text-sm flex justify-between items-center">
-                <div>
-                  {e.isOwnGoal ? (
-                    <>
-                      <span className="font-medium text-destructive">Gol contra</span> de <span className="font-medium">{nameById(e.scorerId)}</span> para <span className="font-medium">{e.team === "azul" ? homeConfig.name : awayConfig.name}</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="font-medium">{nameById(e.scorerId)}</span> marcou para <span className="font-medium">{e.team === "azul" ? homeConfig.name : awayConfig.name}</span>
-                    </>
-                  )}
-                  {e.assistId && !e.isOwnGoal ? (
-                    <> com assistência de <span className="font-medium">{nameById(e.assistId)}</span></>
-                  ) : null}
-                  {typeof e.minute === "number" ? <> aos {e.minute}'</> : null}
-                </div>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => startEdit(e)}
-                    className="h-7 w-7 p-0"
-                  >
-                    <Edit className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setDeletingEvent(e)}
-                    className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              </li>
+              !e.isDummyGoal && (
+                <li key={e.id} className="rounded-md border p-2 text-sm flex justify-between items-center">
+                  <div>
+                    {e.isOwnGoal ? (
+                      <>
+                        <span className="font-medium text-destructive">Gol contra</span> de <span className="font-medium">{nameById(e.scorerId)}</span> para <span className="font-medium">{e.team === "azul" ? homeConfig.name : awayConfig.name}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium">{nameById(e.scorerId)}</span> marcou para <span className="font-medium">{e.team === "azul" ? homeConfig.name : awayConfig.name}</span>
+                      </>
+                    )}
+                    {e.assistId && !e.isOwnGoal ? (
+                      <> com assistência de <span className="font-medium">{nameById(e.assistId)}</span></>
+                    ) : null}
+                    {e.extraAssistIds && e.extraAssistIds.length > 0 && !e.isOwnGoal ? (
+                      <> e <span className="font-medium">{e.extraAssistIds.map(id => nameById(id)).join(", ")}</span></>
+                    ) : null}
+                    {typeof e.minute === "number" ? <> aos {e.minute}'</> : null}
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => startEdit(e)}
+                      className="h-7 w-7 p-0"
+                    >
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDeletingEvent(e)}
+                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </li>
+              )
             ))}
           </ul>
         </div>

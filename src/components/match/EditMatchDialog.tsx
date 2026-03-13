@@ -48,7 +48,12 @@ export default function EditMatchDialog({ match, players, onMatchUpdate, group }
             if (assistTracker.length > 0) {
               const tracker = assistTracker[assistIndex % assistTracker.length];
               if (tracker.remaining > 0) {
-                event.assistId = tracker.playerId;
+                if (!event.assistId) {
+                  event.assistId = tracker.playerId;
+                } else {
+                  if (!event.extraAssistIds) event.extraAssistIds = [];
+                  event.extraAssistIds.push(tracker.playerId);
+                }
                 tracker.remaining -= 1;
                 if (tracker.remaining === 0) {
                   assistTracker.splice(assistIndex % assistTracker.length, 1);
@@ -58,22 +63,59 @@ export default function EditMatchDialog({ match, players, onMatchUpdate, group }
               }
             }
             
+            // If this is the last goal, add all remaining assists!
+            if (i === (player.goals || 0) - 1 && teamPlayers.indexOf(player) === teamPlayers.length - 1) {
+              while (assistTracker.length > 0) {
+                const tracker = assistTracker[assistIndex % assistTracker.length];
+                if (tracker.remaining > 0) {
+                  if (!event.assistId) {
+                    event.assistId = tracker.playerId;
+                  } else {
+                    if (!event.extraAssistIds) event.extraAssistIds = [];
+                    event.extraAssistIds.push(tracker.playerId);
+                  }
+                  tracker.remaining -= 1;
+                  if (tracker.remaining === 0) {
+                    assistTracker.splice(assistIndex % assistTracker.length, 1);
+                  } else {
+                    assistIndex++;
+                  }
+                } else {
+                  assistTracker.splice(assistIndex % assistTracker.length, 1);
+                }
+              }
+            }
+            
             goals.push(event);
           }
           
-          // Adicionar gols contra
-          for (let i = 0; i < (player.ownGoals || 0); i++) {
-            goals.push({
-              id: `${player.playerId}-owngoal-${i}`,
-              team: teamColor === "azul" ? "vermelho" : "azul",
-              scorerId: player.playerId,
-              isOwnGoal: true,
-            });
-          }
+        // Adicionar gols contra
+        for (let i = 0; i < (player.ownGoals || 0); i++) {
+          goals.push({
+            id: `${player.playerId}-owngoal-${i}`,
+            team: teamColor === "azul" ? "vermelho" : "azul",
+            scorerId: player.playerId,
+            isOwnGoal: true,
+          });
         }
-        
-        return goals;
-      };
+      }
+      
+      // Adicionar assistências restantes como eventos dummy
+      for (const tracker of assistTracker) {
+        while (tracker.remaining > 0) {
+          goals.push({
+            id: `${tracker.playerId}-dummy-${Date.now()}-${Math.random()}`,
+            team: teamColor,
+            scorerId: tracker.playerId,
+            assistId: tracker.playerId,
+            isDummyGoal: true,
+          });
+          tracker.remaining -= 1;
+        }
+      }
+      
+      return goals;
+    };
       
       const events = [
         ...createTeamEvents(teams.azul, "azul"),

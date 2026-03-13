@@ -168,17 +168,16 @@ export const useUserRole = (groupId?: string) => {
       const roles = settings?.roles || {}
       const pendingLinks = settings?.pendingLinks || {}
       
-      // 2. Get all players in the group that have a user_id
+      // 2. Get all players in the group
       // This catches users who created a player to request access
       const { data: playersWithUser, error: playersError } = await supabase
         .from('players')
         .select('user_id, name, id, type')
         .eq('group_id', groupId)
-        .not('user_id', 'is', null)
 
       if (playersError) throw playersError
 
-      console.log('fetchPendingUsers: Found players with user_id', playersWithUser);
+      console.log('fetchPendingUsers: Found players', playersWithUser);
 
       // 3. Combine UIDs from settings.roles and players table
       const pendingFromSettings = Object.keys(roles).filter(id => roles[id] === 'pending')
@@ -187,18 +186,30 @@ export const useUserRole = (groupId?: string) => {
       
       const pendingFromPlayers = playersWithUser
         .filter(p => {
+          if (!p.user_id) return false; // Only consider players with a user_id for pending requests
           const userRole = roles[p.user_id];
           const isOwner = p.user_id === groupData.owner_id;
           const isRejected = userRole === 'rejected';
           const isAlreadyMember = userRole && userRole !== 'pending' && userRole !== 'rejected';
           
+          console.log('fetchPendingUsers: Filtering player', { 
+            name: p.name, 
+            userId: p.user_id, 
+            userRole, 
+            isOwner, 
+            isRejected, 
+            isAlreadyMember 
+          });
+
           // A user is pending if:
           // 1. They are not the owner
           // 2. They are not explicitly rejected
           // 3. They are not already a member (approved, admin, etc.)
-          // 4. They either have 'pending' role OR no role at all (but have a player record)
-          const isPending = !isOwner && !isRejected && !isAlreadyMember && (!userRole || userRole === 'pending');
+          // 4. They are explicitly a request (name starts with 'Solicitação:') or have 'pending' role
+          const isExplicitRequest = p.name?.startsWith('Solicitação:') || p.type === 'convidado';
+          const isPending = !isOwner && !isRejected && !isAlreadyMember && (isExplicitRequest || !userRole || userRole === 'pending');
           
+          console.log('fetchPendingUsers: Player is pending?', isPending, { name: p.name, type: p.type });
           return isPending;
         })
         .map(p => p.user_id)
@@ -285,7 +296,6 @@ export const useUserRole = (groupId?: string) => {
     if (!user || !groupId) return
 
     console.log('useUserRole: Setting up real-time subscriptions for group', groupId);
-    fetchPendingUsers();
 
     // 1. Subscribe to group changes (roles, settings)
     const groupChannel = supabase

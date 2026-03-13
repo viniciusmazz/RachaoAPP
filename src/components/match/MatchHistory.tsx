@@ -58,11 +58,37 @@ export default function MatchHistory({ matches, players, onMatchUpdate, onMatchD
   const getPlayerPhoto = (id: string) => 
     players.find(p => p.id === id)?.photoUrl;
 
+  const getMatchStats = (match: Match) => {
+    let goals = 0;
+    let assists = 0;
+
+    if (match.events && match.events.length > 0) {
+      match.events.forEach(e => {
+        if (!e.isOwnGoal && !e.isDummyGoal) {
+          goals++;
+        }
+        if (e.assistId) assists++;
+        if (e.extraAssistIds) assists += e.extraAssistIds.length;
+      });
+    } else {
+      // Fallback to team assignments if events are missing
+      match.teams.azul.forEach(p => {
+        goals += (p.goals || 0);
+        assists += (p.assists || 0);
+      });
+      match.teams.vermelho.forEach(p => {
+        goals += (p.goals || 0);
+        assists += (p.assists || 0);
+      });
+    }
+    return { goals, assists };
+  };
+
   const getMatchResult = (match: Match) => {
     const hasEvents = match.events && match.events.length > 0;
     if (hasEvents) {
-      const azulGoals = match.events.filter(e => e.team === "azul").length;
-      const vermelhoGoals = match.events.filter(e => e.team === "vermelho").length;
+      const azulGoals = match.events.filter(e => e.team === "azul" && !e.isOwnGoal && !e.isDummyGoal).length;
+      const vermelhoGoals = match.events.filter(e => e.team === "vermelho" && !e.isOwnGoal && !e.isDummyGoal).length;
       return { azul: azulGoals, vermelho: vermelhoGoals };
     }
     const azul = (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
@@ -454,6 +480,11 @@ export default function MatchHistory({ matches, players, onMatchUpdate, onMatchD
                         <Badge variant="secondary" style={{ color: awayConfig.color, backgroundColor: `${awayConfig.color}15` }}>
                           {result.vermelho} {awayConfig.name}
                         </Badge>
+                        {getMatchStats(match).assists > getMatchStats(match).goals && (
+                          <Badge variant="destructive" className="ml-2">
+                            ⚠️ Mais assistências que gols
+                          </Badge>
+                        )}
                       </div>
                       {match.observations && (
                         <p className="text-sm text-muted-foreground mt-2 line-clamp-2 italic">

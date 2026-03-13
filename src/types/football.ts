@@ -38,7 +38,9 @@ export interface MatchEvent {
   team: TeamSide;
   scorerId: string;
   assistId?: string;
+  extraAssistIds?: string[];
   isOwnGoal?: boolean;
+  isDummyGoal?: boolean;
 }
 
 export interface Match {

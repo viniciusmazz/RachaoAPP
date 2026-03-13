@@ -167,11 +167,14 @@ export default function ConsolidatedStats({ userId }: { userId: string }) {
             // Sum goals and assists
             if (hasEvents) {
               match.events.forEach(e => {
-                if (e.scorerId === myPlayerId && !e.isOwnGoal) {
+                if (e.scorerId === myPlayerId && !e.isOwnGoal && !e.isDummyGoal) {
                   gols++;
                 }
                 if (e.assistId === myPlayerId) {
                   assistencias++;
+                }
+                if (e.extraAssistIds?.includes(myPlayerId)) {
+                  assistencias += e.extraAssistIds.filter(id => id === myPlayerId).length;
                 }
               });
             } else {

@@ -149,7 +149,7 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
           const s = ensure(e.scorerId);
           if (e.isOwnGoal) {
             s.ownGoals++;
-          } else {
+          } else if (!e.isDummyGoal) {
             s.gols++;
             s.participacoes++;
           }
@@ -159,6 +159,15 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
             const s = ensure(e.assistId);
             s.assistencias++;
             s.participacoes++;
+          }
+          if (e.extraAssistIds && e.extraAssistIds.length > 0) {
+            e.extraAssistIds.forEach(id => {
+              if (isMensalista(id)) {
+                const s = ensure(id);
+                s.assistencias++;
+                s.participacoes++;
+              }
+            });
           }
         });
       } else {
