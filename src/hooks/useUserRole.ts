@@ -664,57 +664,46 @@ export const useUserRole = (groupId?: string) => {
     console.log('requestAccess: Starting', { userId: user.id, groupId, playerId });
     try {
       // 1. Create/Update a player record for this user in the group
+      // This record acts as the "request" itself.
       const { data: existingPlayer, error: checkError } = await supabase
         .from('players')
-        .select('id')
+        .select('id, type')
         .eq('group_id', groupId)
         .eq('user_id', user.id)
         .maybeSingle()
 
       if (checkError) throw checkError
 
+      const requestType = playerId ? `claim:${playerId}` : 'request:new';
+      const requestName = `Solicitação: ${user.user_metadata?.name || user.email?.split('@')[0] || 'Novo Membro'}`;
+
       if (!existingPlayer) {
         console.log('requestAccess: Creating player record for request');
-        await supabase
+        const { error: insertError } = await supabase
           .from('players')
           .insert({
             group_id: groupId,
             user_id: user.id,
-            name: `Solicitação: ${user.user_metadata?.name || user.email?.split('@')[0] || 'Novo Membro'}`,
-            type: playerId ? `claim:${playerId}` : 'request:new'
+            name: requestName,
+            type: requestType
           })
+        if (insertError) throw insertError
       } else {
-        // If they already have a record (maybe from a previous rejected request), update it
+        // If they already have a record, update it to the new request type
         console.log('requestAccess: Updating existing player record for request');
-        await supabase
+        const { error: updateError } = await supabase
           .from('players')
           .update({
-            name: `Solicitação: ${user.user_metadata?.name || user.email?.split('@')[0] || 'Novo Membro'}`,
-            type: playerId ? `claim:${playerId}` : 'request:new'
+            name: requestName,
+            type: requestType
           })
           .eq('id', existingPlayer.id)
+        if (updateError) throw updateError
       }
 
-      // 2. Try to update group settings (will only work if user is owner, but good to have)
-      // For non-owners, this will fail but we rely on the player record being picked up by fetchPendingUsers
-      const { data: groupData, error: groupError } = await supabase
-        .from('groups')
-        .select('settings')
-        .eq('id', groupId)
-        .single()
-      
-      if (!groupError && groupData) {
-        const settings = groupData.settings as unknown as GroupSettings
-        const roles = { ...(settings?.roles || {}), [user.id]: 'pending' as AppRole }
-        const pendingLinks = { ...(settings?.pendingLinks || {}), [user.id]: playerId }
-        
-        console.log('requestAccess: Updating group settings', { roles, pendingLinks });
-        
-        await supabase
-          .from('groups')
-          .update({ settings: { ...settings, roles, pendingLinks } })
-          .eq('id', groupId)
-      }
+      // Note: We NO LONGER try to update the groups table here because 
+      // regular users don't have permission to update group settings (RLS).
+      // The admin will see the request by scanning the players table.
       
       console.log('requestAccess: Success');
       setRole('pending')

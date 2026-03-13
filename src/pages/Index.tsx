@@ -338,11 +338,14 @@ const Index = ({ group, refreshGroup }: IndexProps) => {
             ) : (
               <JoinGroupDialog 
                 players={players.filter(p => {
-                  const linkedUserRole = p.userId ? group.settings.roles?.[p.userId] : null;
-                  const isLinkedInTable = !!p.userId && linkedUserRole !== 'rejected';
+                  // Only show players that are NOT linked to any user in the table
+                  if (p.userId) return false;
+                  
+                  // Also check group settings for links (playerLinks and pendingLinks)
                   const isLinkedInSettings = Object.values(group.settings.playerLinks || {}).includes(p.id);
                   const isPendingLink = Object.values(group.settings.pendingLinks || {}).includes(p.id);
-                  return !isLinkedInTable && !isLinkedInSettings && !isPendingLink;
+                  
+                  return !isLinkedInSettings && !isPendingLink;
                 })}
                 onRequestAccess={handleRequestAccess}
                 isPending={isPending}
