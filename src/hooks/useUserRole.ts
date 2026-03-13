@@ -229,11 +229,11 @@ export const useUserRole = (groupId?: string) => {
         
         // Check if this player record is a claim for another player
         const isClaim = playerLink?.type?.startsWith('claim:');
-        const isNewRequest = playerLink?.type === 'request:new';
+        const isNewRequest = playerLink?.name?.startsWith('Solicitação:');
         
         // If it's a claim, the ID is in the type string. 
         // If it's a new request, there is NO claimed player ID (the playerLink is just a placeholder)
-        const claimedPlayerId = isClaim ? playerLink.type.split(':')[1] : (pendingLinks[userId] || null);
+        const claimedPlayerId = isClaim ? playerLink.type.split(':')[1] : (isNewRequest ? null : (pendingLinks[userId] || null));
         
         return {
           id: userId,
@@ -388,7 +388,7 @@ export const useUserRole = (groupId?: string) => {
             .delete()
             .eq('user_id', userId)
             .eq('group_id', groupId)
-            .eq('type', 'request:new');
+            .ilike('name', 'Solicitação:%');
         }
         
         const { error: updateError } = await supabase
@@ -618,7 +618,7 @@ export const useUserRole = (groupId?: string) => {
 
           if (userPlayers && userPlayers.length > 0) {
             for (const p of userPlayers) {
-              if (p.type?.startsWith('claim:') || p.type?.startsWith('request:')) {
+              if (p.type?.startsWith('claim:') || p.name?.startsWith('Solicitação:')) {
                 console.log('rejectUser: Deleting placeholder player', p.id);
                 await supabase.from('players').delete().eq('id', p.id);
               } else {

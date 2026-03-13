@@ -88,8 +88,8 @@ export default function PlayerForm({
 
   const getPositionLabel = (pos: PlayerPosition) => POSITIONS.find(p => p.value === pos)?.label ?? pos;
 
-  const mensalistas = players.filter(p => p.type === "mensalista").sort((a, b) => a.name.localeCompare(b.name));
-  const convidados = players.filter(p => p.type === "convidado").sort((a, b) => a.name.localeCompare(b.name));
+  const mensalistas = players.filter(p => p.type === "mensalista" && !p.name.startsWith("Solicitação:")).sort((a, b) => a.name.localeCompare(b.name));
+  const convidados = players.filter(p => p.type === "convidado" && !p.name.startsWith("Solicitação:")).sort((a, b) => a.name.localeCompare(b.name));
 
   const renderPlayerList = (list: Player[]) => (
     <ul className="space-y-3">
