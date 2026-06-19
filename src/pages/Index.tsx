@@ -50,6 +50,12 @@ const Index = ({ group, refreshGroup }: IndexProps) => {
   const [reportFilePath, setReportFilePath] = useState<string | null>(null);
   const [observations, setObservations] = useState<string>("");
   const [requestingAccess, setRequestingAccess] = useState(false);
+  const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem(`rachao:tab:${group.id}`) || 'relatorios');
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    sessionStorage.setItem(`rachao:tab:${group.id}`, value);
+  };
   
   const isOwner = user?.id === group.ownerId;
   const isPending = isGlobalPending && !isOwner;
@@ -360,7 +366,7 @@ const Index = ({ group, refreshGroup }: IndexProps) => {
           </main>
         ) : (
           <main className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 p-6 md:p-10 border border-slate-100">
-            <Tabs defaultValue="relatorios" className="space-y-8">
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-8">
             <TabsList className="flex flex-wrap h-auto p-1 bg-slate-100/50 rounded-2xl gap-1">
               <TabsTrigger value="relatorios" className="rounded-xl px-6 py-2.5 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">Estatísticas</TabsTrigger>
               <TabsTrigger value="historico" className="rounded-xl px-6 py-2.5 font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">Histórico</TabsTrigger>
