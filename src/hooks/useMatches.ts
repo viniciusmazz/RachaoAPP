@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import type { Match, Teams, MatchEvent } from '@/types/football'
 import type { Json } from '@/integrations/supabase/types'
@@ -8,9 +8,8 @@ export const useMatches = (groupId?: string) => {
   const [matches, setMatches] = useState<Match[]>([])
   const [loading, setLoading] = useState(true)
 
-  const loadMatches = async () => {
+  const loadMatches = useCallback(async () => {
     try {
-      console.log('Loading matches from secure table')
       let query = supabase
         .from('matches')
         .select('*')
@@ -24,25 +23,19 @@ export const useMatches = (groupId?: string) => {
 
       if (error) throw error
 
-        const mappedMatches: Match[] = data.map(match => ({
-          id: match.id,
-          date: new Date(match.date),
-          teams: match.teams as unknown as Teams,
-          events: match.events as unknown as MatchEvent[],
-          reportFilePath: match.report_file_path || undefined,
-          observations: (match as { observations?: string }).observations || undefined
-        }))
+      const mappedMatches: Match[] = data.map(match => ({
+        id: match.id,
+        date: new Date(match.date),
+        teams: match.teams as unknown as Teams,
+        events: match.events as unknown as MatchEvent[],
+        reportFilePath: match.report_file_path || undefined,
+        observations: (match as { observations?: string }).observations || undefined
+      }))
 
       setMatches(mappedMatches)
     } catch (error) {
       console.error('Erro ao carregar partidas:', error)
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar as partidas",
-        variant: "destructive"
-      })
-      
-      // Fallback to localStorage
+
       try {
         const stored = localStorage.getItem('football:matches')
         if (stored) {
@@ -51,6 +44,17 @@ export const useMatches = (groupId?: string) => {
             date: new Date(m.date),
           }))
           setMatches(parsed)
+          toast({
+            title: "Modo offline",
+            description: "Exibindo dados em cache local. Algumas informações podem estar desatualizadas.",
+            variant: "destructive"
+          })
+        } else {
+          toast({
+            title: "Erro",
+            description: "Não foi possível carregar as partidas",
+            variant: "destructive"
+          })
         }
       } catch (storageError) {
         console.error('Erro ao carregar do localStorage:', storageError)
@@ -58,7 +62,11 @@ export const useMatches = (groupId?: string) => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [groupId])
+
+  useEffect(() => {
+    loadMatches()
+  }, [loadMatches])
 
   const saveMatch = async (match: Omit<Match, 'id'>) => {
     try {
@@ -66,9 +74,8 @@ export const useMatches = (groupId?: string) => {
       if (sessionError) console.warn('Session error in saveMatch:', sessionError.message)
       const session = sessionData?.session
       const user = session?.user
-      
+
       if (!user) {
-        // Fallback para localStorage
         const newMatch: Match = {
           ...match,
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -126,88 +133,15 @@ export const useMatches = (groupId?: string) => {
     }
   }
 
-  useEffect(() => {
-    let mounted = true;
-    
-    const loadData = async () => {
-      try {
-        console.log('Loading matches from secure table')
-        let query = supabase
-          .from('matches')
-          .select('*')
-          .order('date', { ascending: false })
-
-        if (groupId) {
-          query = query.eq('group_id', groupId)
-        }
-
-        const { data, error } = await query
-
-        if (error) throw error
-
-        const mappedMatches: Match[] = data.map(match => ({
-          id: match.id,
-          date: new Date(match.date),
-          teams: match.teams as unknown as Teams,
-          events: match.events as unknown as MatchEvent[],
-          reportFilePath: match.report_file_path || undefined,
-          observations: match.observations || undefined
-        }))
-
-        if (mounted) {
-          setMatches(mappedMatches)
-        }
-      } catch (error) {
-        console.error('Erro ao carregar partidas:', error)
-        
-        // Fallback to localStorage
-        try {
-          const stored = localStorage.getItem('football:matches')
-          if (stored && mounted) {
-            const parsed = JSON.parse(stored).map((m: Match) => ({
-              ...m,
-              date: new Date(m.date),
-            }))
-            setMatches(parsed)
-            if (mounted) {
-              toast({
-                title: "Modo offline",
-                description: "Exibindo dados em cache local. Algumas informações podem estar desatualizadas.",
-                variant: "destructive"
-              })
-            }
-          } else if (mounted) {
-            toast({
-              title: "Erro",
-              description: "Não foi possível carregar as partidas",
-              variant: "destructive"
-            })
-          }
-        } catch (storageError) {
-          console.error('Erro ao carregar do localStorage:', storageError)
-        }
-      } finally {
-        if (mounted) setLoading(false)
-      }
-    };
-    
-    loadData();
-    
-    return () => {
-      mounted = false;
-    };
-  }, [groupId])
-
   const updateMatch = async (matchId: string, updatedMatch: Omit<Match, 'id'>) => {
     try {
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
       if (sessionError) console.warn('Session error in updateMatch:', sessionError.message)
       const session = sessionData?.session
       const user = session?.user
-      
+
       if (!user) {
-        // Fallback para localStorage
-        const updatedMatches = matches.map(match => 
+        const updatedMatches = matches.map(match =>
           match.id === matchId ? { ...updatedMatch, id: matchId } : match
         )
         setMatches(updatedMatches)
@@ -242,7 +176,7 @@ export const useMatches = (groupId?: string) => {
         observations: updatedMatch.observations
       }
 
-      setMatches(prev => prev.map(match => 
+      setMatches(prev => prev.map(match =>
         match.id === matchId ? newMatch : match
       ))
 
@@ -267,9 +201,8 @@ export const useMatches = (groupId?: string) => {
       if (sessionError) console.warn('Session error in deleteMatch:', sessionError.message)
       const session = sessionData?.session
       const user = session?.user
-      
+
       if (!user) {
-        // Fallback para localStorage
         const updatedMatches = matches.filter(match => match.id !== matchId)
         setMatches(updatedMatches)
         localStorage.setItem('football:matches', JSON.stringify(updatedMatches))

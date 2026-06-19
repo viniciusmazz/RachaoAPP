@@ -148,7 +148,7 @@ export default function FinancialModule({ groupId, players, isOwner }: Financial
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {[2024, 2025, 2026, 2027].map(y => (
+                {Array.from({ length: 4 }, (_, i) => new Date().getFullYear() - 1 + i).map(y => (
                   <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
                 ))}
               </SelectContent>
