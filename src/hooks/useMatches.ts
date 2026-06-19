@@ -169,17 +169,22 @@ export const useMatches = (groupId?: string) => {
               date: new Date(m.date),
             }))
             setMatches(parsed)
+            if (mounted) {
+              toast({
+                title: "Modo offline",
+                description: "Exibindo dados em cache local. Algumas informações podem estar desatualizadas.",
+                variant: "destructive"
+              })
+            }
+          } else if (mounted) {
+            toast({
+              title: "Erro",
+              description: "Não foi possível carregar as partidas",
+              variant: "destructive"
+            })
           }
         } catch (storageError) {
           console.error('Erro ao carregar do localStorage:', storageError)
-        }
-        
-        if (mounted) {
-          toast({
-            title: "Erro",
-            description: "Não foi possível carregar as partidas",
-            variant: "destructive"
-          })
         }
       } finally {
         if (mounted) setLoading(false)

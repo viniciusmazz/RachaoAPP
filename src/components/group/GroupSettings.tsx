@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,16 +52,17 @@ const GroupSettingsComponent = ({ group, onSave }: GroupSettingsProps) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    console.log('Uploading image:', file.name, file.size, file.type);
+    if (file.size > 500 * 1024) {
+      toast({ title: "Imagem muito grande", description: "Tamanho máximo permitido: 500KB.", variant: "destructive" });
+      e.target.value = '';
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = () => {
-      const result = reader.result as string;
-      console.log('Image read complete, length:', result.length);
-      callback(result);
+      callback(reader.result as string);
     };
-    reader.onerror = (err) => {
-      console.error('FileReader error:', err);
+    reader.onerror = () => {
       toast({ title: "Erro", description: "Falha ao ler o arquivo de imagem", variant: "destructive" });
     };
     reader.readAsDataURL(file);
@@ -150,14 +152,15 @@ const GroupSettingsComponent = ({ group, onSave }: GroupSettingsProps) => {
                 <Input value={name} onChange={(e) => setName(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label>URL (slug)</Label>
+                <Label className="flex items-center gap-2">
+                  URL (slug)
+                  <Lock className="h-3 w-3 text-muted-foreground" />
+                </Label>
                 <div className="flex items-center gap-1">
                   <span className="text-sm text-muted-foreground whitespace-nowrap">rachao.app.br/</span>
-                  <Input
-                    value={slug}
-                    onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                  />
+                  <Input value={slug} disabled className="bg-muted cursor-not-allowed" />
                 </div>
+                <p className="text-xs text-muted-foreground">O slug não pode ser alterado após a criação do grupo.</p>
               </div>
             </div>
           </div>

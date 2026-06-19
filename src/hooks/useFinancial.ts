@@ -147,14 +147,21 @@ export const useFinancial = (groupId?: string) => {
         }).eq('id', existing.id)
 
         if (newPaid) {
-          await addCashEntry({
-            type: 'income',
-            category: 'mensalidade',
-            description: `Mensalidade: ${playerName || 'Jogador'} - ${month}/${year}`,
-            amount: amount,
-            date: new Date().toISOString(),
-            playerId: playerId,
-          })
+          const alreadyHasEntry = cashEntries.some(e =>
+            e.playerId === playerId &&
+            e.category === 'mensalidade' &&
+            e.description.includes(`${month}/${year}`)
+          )
+          if (!alreadyHasEntry) {
+            await addCashEntry({
+              type: 'income',
+              category: 'mensalidade',
+              description: `Mensalidade: ${playerName || 'Jogador'} - ${month}/${year}`,
+              amount: amount,
+              date: new Date().toISOString(),
+              playerId: playerId,
+            })
+          }
         } else {
           // Try to remove the automatic entry
           const autoEntry = cashEntries.find(e => 
@@ -177,14 +184,21 @@ export const useFinancial = (groupId?: string) => {
           paid_at: new Date().toISOString(),
         })
 
-        await addCashEntry({
-          type: 'income',
-          category: 'mensalidade',
-          description: `Mensalidade: ${playerName || 'Jogador'} - ${month}/${year}`,
-          amount: amount,
-          date: new Date().toISOString(),
-          playerId: playerId,
-        })
+        const alreadyHasEntry = cashEntries.some(e =>
+          e.playerId === playerId &&
+          e.category === 'mensalidade' &&
+          e.description.includes(`${month}/${year}`)
+        )
+        if (!alreadyHasEntry) {
+          await addCashEntry({
+            type: 'income',
+            category: 'mensalidade',
+            description: `Mensalidade: ${playerName || 'Jogador'} - ${month}/${year}`,
+            amount: amount,
+            date: new Date().toISOString(),
+            playerId: playerId,
+          })
+        }
       }
       await loadAll()
     } catch (error) {

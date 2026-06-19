@@ -187,17 +187,22 @@ export const usePlayers = (groupId?: string) => {
           const stored = localStorage.getItem('football:players')
           if (stored && mounted) {
             setPlayers(JSON.parse(stored))
+            if (mounted) {
+              toast({
+                title: "Modo offline",
+                description: "Exibindo jogadores em cache local. Algumas informações podem estar desatualizadas.",
+                variant: "destructive"
+              })
+            }
+          } else if (mounted) {
+            toast({
+              title: "Erro",
+              description: "Não foi possível carregar os jogadores",
+              variant: "destructive"
+            })
           }
         } catch (storageError) {
           console.error('Erro ao carregar do localStorage:', storageError)
-        }
-        
-        if (mounted) {
-          toast({
-            title: "Erro",
-            description: "Não foi possível carregar os jogadores",
-            variant: "destructive"
-          })
         }
       } finally {
         if (mounted) setLoading(false)

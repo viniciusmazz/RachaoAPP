@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import { useAuth } from './useAuth'
 import { toast } from '@/hooks/use-toast'
@@ -382,10 +382,19 @@ export const useUserRole = (groupId?: string) => {
     }
   }, [groupId])
 
+  const realtimeDebounce = useRef<ReturnType<typeof setTimeout>>();
+
   useEffect(() => {
     if (!user || !groupId) return
 
-    console.log('useUserRole: Setting up real-time subscriptions for group', groupId);
+    const debouncedRefetch = () => {
+      clearTimeout(realtimeDebounce.current);
+      realtimeDebounce.current = setTimeout(() => {
+        fetchRole();
+        fetchPendingUsers();
+        fetchGroupMembers();
+      }, 300);
+    };
 
     // 1. Subscribe to group changes (roles, settings)
     const groupChannel = supabase
@@ -398,12 +407,7 @@ export const useUserRole = (groupId?: string) => {
           table: 'groups',
           filter: `id=eq.${groupId}`
         },
-        (payload) => {
-          console.log('useUserRole: Group updated via realtime', payload);
-          fetchRole();
-          fetchPendingUsers();
-          fetchGroupMembers();
-        }
+        () => debouncedRefetch()
       )
       .subscribe()
 
@@ -418,17 +422,12 @@ export const useUserRole = (groupId?: string) => {
           table: 'players',
           filter: `group_id=eq.${groupId}`
         },
-        (payload) => {
-          console.log('useUserRole: Player table changed via realtime', payload);
-          fetchRole();
-          fetchPendingUsers();
-          fetchGroupMembers();
-        }
+        () => debouncedRefetch()
       )
       .subscribe()
 
     return () => {
-      console.log('useUserRole: Cleaning up subscriptions');
+      clearTimeout(realtimeDebounce.current);
       supabase.removeChannel(groupChannel)
       supabase.removeChannel(playerChannel)
     }

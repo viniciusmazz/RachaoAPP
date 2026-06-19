@@ -9,6 +9,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { toast } from "@/hooks/use-toast";
 import type { Player, PlayerType, PlayerPosition, PositionSkill } from "@/types/football";
 
 const POSITIONS: { value: PlayerPosition; label: string }[] = [
@@ -45,6 +47,7 @@ export default function PlayerForm({
   const [preview, setPreview] = useState<string | undefined>(undefined);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [positions, setPositions] = useState<PositionSkill[]>([]);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
 
   const handleSubmit = () => {
     if (!name.trim()) return;
@@ -119,7 +122,7 @@ export default function PlayerForm({
           {isAdmin && (
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={() => handleEdit(p)}>Editar</Button>
-              <Button variant="destructive" size="sm" onClick={() => onRemove(p.id)}>Remover</Button>
+              <Button variant="destructive" size="sm" onClick={() => setConfirmRemoveId(p.id)}>Remover</Button>
             </div>
           )}
         </li>
@@ -158,8 +161,13 @@ export default function PlayerForm({
                   accept="image/*"
                   onChange={(e) => {
                     const file = e.target.files?.[0] ?? null;
+                    if (!file) { setPhotoFile(null); setPreview(undefined); return; }
+                    if (file.size > 500 * 1024) {
+                      toast({ title: "Imagem muito grande", description: "Tamanho máximo permitido: 500KB.", variant: "destructive" });
+                      e.target.value = '';
+                      return;
+                    }
                     setPhotoFile(file);
-                    if (!file) { setPreview(undefined); return; }
                     const reader = new FileReader();
                     reader.onload = () => setPreview(reader.result as string);
                     reader.readAsDataURL(file);
@@ -231,6 +239,24 @@ export default function PlayerForm({
           </Tabs>
         </CardContent>
       </Card>
+      <Dialog open={!!confirmRemoveId} onOpenChange={(open) => { if (!open) setConfirmRemoveId(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remover jogador</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja remover{" "}
+              <strong>{players.find(p => p.id === confirmRemoveId)?.name}</strong>?
+              Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmRemoveId(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => { if (confirmRemoveId) { onRemove(confirmRemoveId); setConfirmRemoveId(null); } }}>
+              Remover
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

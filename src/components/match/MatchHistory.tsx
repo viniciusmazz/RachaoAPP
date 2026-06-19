@@ -34,6 +34,8 @@ export default function MatchHistory({ matches, players, onMatchUpdate, onMatchD
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [matchToDelete, setMatchToDelete] = useState<Match | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const MATCHES_PER_PAGE = 10;
 
   // Extrair anos disponíveis das partidas
   const availableYears = useMemo(() => {
@@ -52,11 +54,16 @@ export default function MatchHistory({ matches, players, onMatchUpdate, onMatchD
     return matches.filter(m => new Date(m.date).getFullYear() === selectedYear);
   }, [matches, selectedYear]);
 
-  const getPlayerName = (id: string) => 
-    players.find(p => p.id === id)?.name || "Jogador não encontrado";
+  const paginatedMatches = useMemo(() => {
+    const start = (currentPage - 1) * MATCHES_PER_PAGE;
+    return filteredMatches.slice(start, start + MATCHES_PER_PAGE);
+  }, [filteredMatches, currentPage, MATCHES_PER_PAGE]);
 
-  const getPlayerPhoto = (id: string) => 
-    players.find(p => p.id === id)?.photoUrl;
+  const totalPages = Math.ceil(filteredMatches.length / MATCHES_PER_PAGE);
+
+  const playerMap = useMemo(() => new Map(players.map(p => [p.id, p])), [players]);
+  const getPlayerName = (id: string) => playerMap.get(id)?.name || "Jogador não encontrado";
+  const getPlayerPhoto = (id: string) => playerMap.get(id)?.photoUrl;
 
   const getMatchStats = (match: Match) => {
     let goals = 0;
@@ -433,7 +440,7 @@ export default function MatchHistory({ matches, players, onMatchUpdate, onMatchD
           <span className="font-medium text-foreground">Temporada:</span>
           <Select
             value={selectedYear.toString()}
-            onValueChange={(value) => setSelectedYear(parseInt(value))}
+            onValueChange={(value) => { setSelectedYear(parseInt(value)); setCurrentPage(1); }}
           >
             <SelectTrigger className="w-32 bg-background">
               <SelectValue />
@@ -462,7 +469,7 @@ export default function MatchHistory({ matches, players, onMatchUpdate, onMatchD
         </Card>
       ) : (
         <div className="grid gap-3">
-          {filteredMatches.map((match) => {
+          {paginatedMatches.map((match) => {
             const result = getMatchResult(match);
             return (
               <Card key={match.id} className="hover:shadow-md transition-shadow">
@@ -553,6 +560,29 @@ export default function MatchHistory({ matches, players, onMatchUpdate, onMatchD
               </Card>
             );
           })}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Anterior
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {currentPage} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Próxima
+              </Button>
+            </div>
+          )}
         </div>
       )}
 

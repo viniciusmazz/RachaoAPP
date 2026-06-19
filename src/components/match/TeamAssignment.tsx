@@ -90,6 +90,13 @@ export default function TeamAssignment({ players, teams, onTeamsChange, date, on
 
   const nameById = (id: string) => players.find((p) => p.id === id)?.name ?? "";
 
+  const missingGoalkeepers = useMemo(() => {
+    const missing: string[] = [];
+    if (teams.azul.length > 0 && !teams.azul.some(t => t.isGoalkeeper)) missing.push(homeConfig.name);
+    if (teams.vermelho.length > 0 && !teams.vermelho.some(t => t.isGoalkeeper)) missing.push(awayConfig.name);
+    return missing;
+  }, [teams, homeConfig.name, awayConfig.name]);
+
   return (
     <div className="space-y-6">
       {/* Score Header with Date */}
@@ -331,6 +338,14 @@ export default function TeamAssignment({ players, teams, onTeamsChange, date, on
         </Card>
       </div>
 
+      {missingGoalkeepers.length > 0 && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm">
+          <span>⚠️</span>
+          <span>
+            Goleiro não definido: <strong>{missingGoalkeepers.join(', ')}</strong>. As estatísticas de goleiro não serão registradas para {missingGoalkeepers.length > 1 ? 'esses times' : 'esse time'}.
+          </span>
+        </div>
+      )}
       <p className="text-sm text-muted-foreground text-center">Dica: clique no ícone de luva para definir o goleiro de cada time.</p>
     </div>
   );

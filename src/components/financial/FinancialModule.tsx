@@ -133,9 +133,14 @@ export default function FinancialModule({ groupId, players, isOwner }: Financial
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {MONTH_NAMES.map((name, i) => (
-                  <SelectItem key={i} value={(i + 1).toString()}>{name}</SelectItem>
-                ))}
+                {MONTH_NAMES.map((name, i) => {
+                  const isCurrentMonth = (i + 1) === new Date().getMonth() + 1 && selectedYear === new Date().getFullYear();
+                  return (
+                    <SelectItem key={i} value={(i + 1).toString()}>
+                      {name}{isCurrentMonth ? ' ★' : ''}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
             <Select value={selectedYear.toString()} onValueChange={v => setSelectedYear(parseInt(v))}>
