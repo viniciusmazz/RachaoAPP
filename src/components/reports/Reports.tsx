@@ -4,7 +4,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart3, Trophy, Shield, AlertTriangle, Target, Calendar, Crosshair, Users } from "lucide-react";
+import { BarChart3, Trophy, Shield, AlertTriangle, Target, Calendar, Crosshair, Users, Download } from "lucide-react";
+import { format } from "date-fns";
 import type { Match, Player, Group } from "@/types/football";
 import SeasonSummary from "./SeasonSummary";
 
@@ -202,11 +203,12 @@ export default function Reports({ matches, players, group }: ReportsProps) {
       }
     });
 
-    return Array.from(playerStatsMap.values()).sort((a, b) => 
-      b.pontos - a.pontos || 
-      b.vitorias - a.vitorias || 
-      b.gols - a.gols || 
+    return Array.from(playerStatsMap.values()).sort((a, b) =>
+      b.pontos - a.pontos ||
+      b.vitorias - a.vitorias ||
+      b.gols - a.gols ||
       b.assistencias - a.assistencias ||
+      b.aproveitamento - a.aproveitamento ||
       a.nome.localeCompare(b.nome)
     );
   };
@@ -485,6 +487,77 @@ export default function Reports({ matches, players, group }: ReportsProps) {
       .sort((a, b) => b.total - a.total);
   };
 
+  const exportToCSV = () => {
+    const rows: string[][] = [[
+      'Data', 'Time', 'Jogador', 'Resultado', 'Gols do Time', 'Gols Sofridos',
+      'Gols', 'Assistências', 'G.C.', 'Field Goals', 'Goleiro', 'Pontos'
+    ]];
+
+    filteredMatches.forEach(match => {
+      const hasEvents = match.events && match.events.length > 0;
+
+      const golsAzul = hasEvents
+        ? match.events.filter(e => (e.team === 'azul' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'vermelho' && e.isOwnGoal)).length
+        : (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) + (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+      const golsVermelho = hasEvents
+        ? match.events.filter(e => (e.team === 'vermelho' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'azul' && e.isOwnGoal)).length
+        : (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) + (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
+
+      const azulResult = golsAzul > golsVermelho ? 'V' : golsAzul < golsVermelho ? 'D' : 'E';
+      const vermelhoResult = golsVermelho > golsAzul ? 'V' : golsVermelho < golsAzul ? 'D' : 'E';
+      const azulPts = azulResult === 'V' ? 3 : azulResult === 'E' ? 1 : 0;
+      const vermelhoPts = vermelhoResult === 'V' ? 3 : vermelhoResult === 'E' ? 1 : 0;
+      const dateStr = format(new Date(match.date), 'dd/MM/yyyy');
+
+      match.teams.azul.forEach(t => {
+        const gols = hasEvents
+          ? match.events.filter(e => e.scorerId === t.playerId && !e.isOwnGoal && !e.isDummyGoal).length
+          : (t.goals || 0);
+        const assists = hasEvents
+          ? match.events.filter(e => e.assistId === t.playerId).length
+            + match.events.reduce((sum, e) => sum + (e.extraAssistIds?.filter(id => id === t.playerId).length ?? 0), 0)
+          : (t.assists || 0);
+        const ownGoals = hasEvents
+          ? match.events.filter(e => e.scorerId === t.playerId && e.isOwnGoal).length
+          : (t.ownGoals || 0);
+        rows.push([
+          dateStr, homeConfig.name, nameById(t.playerId),
+          azulResult, String(golsAzul), String(golsVermelho),
+          String(gols), String(assists), String(ownGoals),
+          String(t.fieldGoals || 0), t.isGoalkeeper ? 'Sim' : 'Não', String(azulPts)
+        ]);
+      });
+
+      match.teams.vermelho.forEach(t => {
+        const gols = hasEvents
+          ? match.events.filter(e => e.scorerId === t.playerId && !e.isOwnGoal && !e.isDummyGoal).length
+          : (t.goals || 0);
+        const assists = hasEvents
+          ? match.events.filter(e => e.assistId === t.playerId).length
+            + match.events.reduce((sum, e) => sum + (e.extraAssistIds?.filter(id => id === t.playerId).length ?? 0), 0)
+          : (t.assists || 0);
+        const ownGoals = hasEvents
+          ? match.events.filter(e => e.scorerId === t.playerId && e.isOwnGoal).length
+          : (t.ownGoals || 0);
+        rows.push([
+          dateStr, awayConfig.name, nameById(t.playerId),
+          vermelhoResult, String(golsVermelho), String(golsAzul),
+          String(gols), String(assists), String(ownGoals),
+          String(t.fieldGoals || 0), t.isGoalkeeper ? 'Sim' : 'Não', String(vermelhoPts)
+        ]);
+      });
+    });
+
+    const csv = rows.map(r => r.map(c => `"${c}"`).join(';')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `rachao_${selectedYear}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const StatCard = ({ title, data, icon: Icon, type }: { 
     title: string; 
     data: { id: string; nome: string; gols?: number; assistencias?: number; fieldGoals?: number; total?: number; media?: number; sofridos?: number }[]; 
@@ -738,6 +811,16 @@ export default function Reports({ matches, players, group }: ReportsProps) {
         <span className="text-sm text-muted-foreground">
           ({filteredMatches.length} partida{filteredMatches.length !== 1 ? 's' : ''})
         </span>
+        <Button
+          variant="outline"
+          size="sm"
+          className="ml-auto gap-2"
+          onClick={exportToCSV}
+          disabled={filteredMatches.length === 0}
+        >
+          <Download className="h-4 w-4" />
+          Exportar CSV
+        </Button>
       </div>
 
       <div className="space-y-8">
