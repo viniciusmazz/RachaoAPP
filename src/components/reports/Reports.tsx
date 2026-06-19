@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { BarChart3, Trophy, Shield, AlertTriangle, Target, Calendar, Crosshair, 
 import { format } from "date-fns";
 import type { Match, Player, Group } from "@/types/football";
 import SeasonSummary from "./SeasonSummary";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PlayerStats {
   id: string;
@@ -515,6 +516,23 @@ export default function Reports({ matches, players, group }: ReportsProps) {
     });
   }, [filteredMatches]);
 
+  const [reportUrls, setReportUrls] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    const withReports = filteredMatches.filter(m => m.reportFilePath);
+    if (withReports.length === 0) { setReportUrls(new Map()); return; }
+
+    supabase.storage
+      .from('match-reports')
+      .createSignedUrls(withReports.map(m => m.reportFilePath!), 3600)
+      .then(({ data }) => {
+        if (!data) return;
+        const map = new Map<string, string>();
+        withReports.forEach((m, i) => { if (data[i]?.signedUrl) map.set(m.id, data[i].signedUrl); });
+        setReportUrls(map);
+      });
+  }, [filteredMatches]);
+
   const StatCard = ({ title, data, icon: Icon, type }: { 
     title: string; 
     data: { id: string; nome: string; gols?: number; assistencias?: number; fieldGoals?: number; total?: number; media?: number; sofridos?: number }[]; 
@@ -868,8 +886,10 @@ export default function Reports({ matches, players, group }: ReportsProps) {
                   );
                 };
 
+                const reportUrl = reportUrls.get(match.id);
                 return (
-                  <Card key={match.id} className="overflow-hidden">
+                  <div key={match.id} className="flex gap-3 items-start">
+                  <Card className="overflow-hidden flex-1 min-w-0">
                     <div
                       className="flex items-center justify-between px-4 py-2 border-b"
                       style={{ background: `linear-gradient(to right, ${homeConfig.color}15, transparent 40%, transparent 60%, ${awayConfig.color}15)` }}
@@ -903,6 +923,14 @@ export default function Reports({ matches, players, group }: ReportsProps) {
                       </div>
                     </CardContent>
                   </Card>
+                  {reportUrl && (
+                    <img
+                      src={reportUrl}
+                      alt="Súmula"
+                      className="shrink-0 w-44 md:w-60 rounded-lg border border-slate-200 object-contain self-start"
+                    />
+                  )}
+                  </div>
                 );
               })}
             </div>
