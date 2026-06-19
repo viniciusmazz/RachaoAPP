@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart3, Trophy, Shield, AlertTriangle, Target, Calendar, Crosshair, Users, Download } from "lucide-react";
+import { BarChart3, Trophy, Shield, AlertTriangle, Target, Calendar, Crosshair, Users, FileText } from "lucide-react";
 import { format } from "date-fns";
 import type { Match, Player, Group } from "@/types/football";
 import SeasonSummary from "./SeasonSummary";
@@ -487,15 +487,9 @@ export default function Reports({ matches, players, group }: ReportsProps) {
       .sort((a, b) => b.total - a.total);
   };
 
-  const exportToCSV = () => {
-    const rows: string[][] = [[
-      'Data', 'Time', 'Jogador', 'Resultado', 'Gols do Time', 'Gols Sofridos',
-      'Gols', 'Assistências', 'G.C.', 'Field Goals', 'Goleiro', 'Pontos'
-    ]];
-
-    filteredMatches.forEach(match => {
+  const matchLog = useMemo(() => {
+    return filteredMatches.map(match => {
       const hasEvents = match.events && match.events.length > 0;
-
       const golsAzul = hasEvents
         ? match.events.filter(e => (e.team === 'azul' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'vermelho' && e.isOwnGoal)).length
         : (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) + (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
@@ -503,60 +497,23 @@ export default function Reports({ matches, players, group }: ReportsProps) {
         ? match.events.filter(e => (e.team === 'vermelho' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'azul' && e.isOwnGoal)).length
         : (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) + (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
-      const azulResult = golsAzul > golsVermelho ? 'V' : golsAzul < golsVermelho ? 'D' : 'E';
-      const vermelhoResult = golsVermelho > golsAzul ? 'V' : golsVermelho < golsAzul ? 'D' : 'E';
-      const azulPts = azulResult === 'V' ? 3 : azulResult === 'E' ? 1 : 0;
-      const vermelhoPts = vermelhoResult === 'V' ? 3 : vermelhoResult === 'E' ? 1 : 0;
-      const dateStr = format(new Date(match.date), 'dd/MM/yyyy');
+      const playerStats = (playerId: string) => {
+        if (!hasEvents) {
+          const t = [...match.teams.azul, ...match.teams.vermelho].find(t => t.playerId === playerId);
+          return { gols: t?.goals || 0, assists: t?.assists || 0, ownGoals: t?.ownGoals || 0, fieldGoals: t?.fieldGoals || 0 };
+        }
+        return {
+          gols: match.events.filter(e => e.scorerId === playerId && !e.isOwnGoal && !e.isDummyGoal).length,
+          assists: match.events.filter(e => e.assistId === playerId).length
+            + match.events.reduce((sum, e) => sum + (e.extraAssistIds?.filter(id => id === playerId).length ?? 0), 0),
+          ownGoals: match.events.filter(e => e.scorerId === playerId && e.isOwnGoal).length,
+          fieldGoals: [...match.teams.azul, ...match.teams.vermelho].find(t => t.playerId === playerId)?.fieldGoals || 0,
+        };
+      };
 
-      match.teams.azul.forEach(t => {
-        const gols = hasEvents
-          ? match.events.filter(e => e.scorerId === t.playerId && !e.isOwnGoal && !e.isDummyGoal).length
-          : (t.goals || 0);
-        const assists = hasEvents
-          ? match.events.filter(e => e.assistId === t.playerId).length
-            + match.events.reduce((sum, e) => sum + (e.extraAssistIds?.filter(id => id === t.playerId).length ?? 0), 0)
-          : (t.assists || 0);
-        const ownGoals = hasEvents
-          ? match.events.filter(e => e.scorerId === t.playerId && e.isOwnGoal).length
-          : (t.ownGoals || 0);
-        rows.push([
-          dateStr, homeConfig.name, nameById(t.playerId),
-          azulResult, String(golsAzul), String(golsVermelho),
-          String(gols), String(assists), String(ownGoals),
-          String(t.fieldGoals || 0), t.isGoalkeeper ? 'Sim' : 'Não', String(azulPts)
-        ]);
-      });
-
-      match.teams.vermelho.forEach(t => {
-        const gols = hasEvents
-          ? match.events.filter(e => e.scorerId === t.playerId && !e.isOwnGoal && !e.isDummyGoal).length
-          : (t.goals || 0);
-        const assists = hasEvents
-          ? match.events.filter(e => e.assistId === t.playerId).length
-            + match.events.reduce((sum, e) => sum + (e.extraAssistIds?.filter(id => id === t.playerId).length ?? 0), 0)
-          : (t.assists || 0);
-        const ownGoals = hasEvents
-          ? match.events.filter(e => e.scorerId === t.playerId && e.isOwnGoal).length
-          : (t.ownGoals || 0);
-        rows.push([
-          dateStr, awayConfig.name, nameById(t.playerId),
-          vermelhoResult, String(golsVermelho), String(golsAzul),
-          String(gols), String(assists), String(ownGoals),
-          String(t.fieldGoals || 0), t.isGoalkeeper ? 'Sim' : 'Não', String(vermelhoPts)
-        ]);
-      });
+      return { match, golsAzul, golsVermelho, playerStats };
     });
-
-    const csv = rows.map(r => r.map(c => `"${c}"`).join(';')).join('\n');
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `rachao_${selectedYear}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  }, [filteredMatches]);
 
   const StatCard = ({ title, data, icon: Icon, type }: { 
     title: string; 
@@ -811,16 +768,6 @@ export default function Reports({ matches, players, group }: ReportsProps) {
         <span className="text-sm text-muted-foreground">
           ({filteredMatches.length} partida{filteredMatches.length !== 1 ? 's' : ''})
         </span>
-        <Button
-          variant="outline"
-          size="sm"
-          className="ml-auto gap-2"
-          onClick={exportToCSV}
-          disabled={filteredMatches.length === 0}
-        >
-          <Download className="h-4 w-4" />
-          Exportar CSV
-        </Button>
       </div>
 
       <div className="space-y-8">
@@ -866,25 +813,100 @@ export default function Reports({ matches, players, group }: ReportsProps) {
             <h2 className="text-lg font-bold">Outras Estatísticas</h2>
           </div>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <StatCard 
-              title="Field Goals" 
-              data={createFieldGoalsRanking("mensalista")} 
-              icon={Crosshair} 
+            <StatCard
+              title="Field Goals"
+              data={createFieldGoalsRanking("mensalista")}
+              icon={Crosshair}
               type="fieldgoals"
             />
-            <StatCard 
-              title="Goleiros (Média)" 
-              data={createGoalkeeperRanking("mensalista")} 
-              icon={Shield} 
+            <StatCard
+              title="Goleiros (Média)"
+              data={createGoalkeeperRanking("mensalista")}
+              icon={Shield}
               type="sofridos"
             />
-            <StatCard 
-              title="Gols Contra" 
-              data={createOwnGoalsRanking("mensalista")} 
-              icon={AlertTriangle} 
+            <StatCard
+              title="Gols Contra"
+              data={createOwnGoalsRanking("mensalista")}
+              icon={AlertTriangle}
               type="golscontra"
             />
           </div>
+        </section>
+
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <FileText className="h-5 w-5 text-slate-500" />
+            <h2 className="text-lg font-bold">Partidas da Temporada</h2>
+          </div>
+          {matchLog.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhuma partida neste ano.</p>
+          ) : (
+            <div className="space-y-3">
+              {matchLog.map(({ match, golsAzul, golsVermelho, playerStats }) => {
+                const azulVenceu = golsAzul > golsVermelho;
+                const vermelhoVenceu = golsVermelho > golsAzul;
+                const empate = golsAzul === golsVermelho;
+
+                const renderPlayer = (t: typeof match.teams.azul[0]) => {
+                  const s = playerStats(t.playerId);
+                  const badges: string[] = [];
+                  if (s.gols > 0) badges.push(`${s.gols}G`);
+                  if (s.assists > 0) badges.push(`${s.assists}A`);
+                  if (s.ownGoals > 0) badges.push(`${s.ownGoals}GC`);
+                  if (s.fieldGoals > 0) badges.push(`${s.fieldGoals}FG`);
+                  return (
+                    <div key={t.playerId} className="flex items-center justify-between gap-2 py-0.5">
+                      <span className="text-sm truncate">
+                        {t.isGoalkeeper && <span className="mr-1 text-xs opacity-60">🧤</span>}
+                        {nameById(t.playerId)}
+                      </span>
+                      {badges.length > 0 && (
+                        <span className="text-xs text-muted-foreground whitespace-nowrap font-mono">{badges.join(' ')}</span>
+                      )}
+                    </div>
+                  );
+                };
+
+                return (
+                  <Card key={match.id} className="overflow-hidden">
+                    <div
+                      className="flex items-center justify-between px-4 py-2 border-b"
+                      style={{ background: `linear-gradient(to right, ${homeConfig.color}15, transparent 40%, transparent 60%, ${awayConfig.color}15)` }}
+                    >
+                      <span className="text-xs text-muted-foreground font-medium">
+                        {format(new Date(match.date), 'dd/MM/yyyy')}
+                      </span>
+                      <div className="flex items-center gap-2 font-bold text-lg">
+                        <span style={{ color: azulVenceu ? homeConfig.color : undefined }}>{golsAzul}</span>
+                        <span className="text-muted-foreground text-sm">×</span>
+                        <span style={{ color: vermelhoVenceu ? awayConfig.color : undefined }}>{golsVermelho}</span>
+                      </div>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${empate ? 'bg-yellow-100 text-yellow-800' : 'text-muted-foreground'}`}>
+                        {empate ? 'Empate' : azulVenceu ? homeConfig.name : awayConfig.name}
+                      </span>
+                    </div>
+                    <CardContent className="p-0">
+                      <div className="grid grid-cols-2 divide-x">
+                        <div className="p-3">
+                          <div className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: homeConfig.color }}>
+                            {homeConfig.name}
+                          </div>
+                          {match.teams.azul.map(renderPlayer)}
+                        </div>
+                        <div className="p-3">
+                          <div className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: awayConfig.color }}>
+                            {awayConfig.name}
+                          </div>
+                          {match.teams.vermelho.map(renderPlayer)}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </section>
       </div>
     </div>
