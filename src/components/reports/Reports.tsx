@@ -1,14 +1,12 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart3, Trophy, Shield, AlertTriangle, Target, Calendar, Crosshair, Users, FileText } from "lucide-react";
-import { format } from "date-fns";
+import { BarChart3, Trophy, Shield, AlertTriangle, Target, Calendar, Crosshair, Users } from "lucide-react";
 import type { Match, Player, Group } from "@/types/football";
 import SeasonSummary from "./SeasonSummary";
-import { supabase } from "@/integrations/supabase/client";
 
 interface PlayerStats {
   id: string;
@@ -488,51 +486,6 @@ export default function Reports({ matches, players, group }: ReportsProps) {
       .sort((a, b) => b.total - a.total);
   };
 
-  const matchLog = useMemo(() => {
-    return filteredMatches.map(match => {
-      const hasEvents = match.events && match.events.length > 0;
-      const golsAzul = hasEvents
-        ? match.events.filter(e => e.team === 'azul' && !e.isDummyGoal).length
-        : (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) + (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
-      const golsVermelho = hasEvents
-        ? match.events.filter(e => e.team === 'vermelho' && !e.isDummyGoal).length
-        : (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) + (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
-
-      const playerStats = (playerId: string) => {
-        if (!hasEvents) {
-          const t = [...match.teams.azul, ...match.teams.vermelho].find(t => t.playerId === playerId);
-          return { gols: t?.goals || 0, assists: t?.assists || 0, ownGoals: t?.ownGoals || 0, fieldGoals: t?.fieldGoals || 0 };
-        }
-        return {
-          gols: match.events.filter(e => e.scorerId === playerId && !e.isOwnGoal && !e.isDummyGoal).length,
-          assists: match.events.filter(e => e.assistId === playerId).length
-            + match.events.reduce((sum, e) => sum + (e.extraAssistIds?.filter(id => id === playerId).length ?? 0), 0),
-          ownGoals: match.events.filter(e => e.scorerId === playerId && e.isOwnGoal).length,
-          fieldGoals: [...match.teams.azul, ...match.teams.vermelho].find(t => t.playerId === playerId)?.fieldGoals || 0,
-        };
-      };
-
-      return { match, golsAzul, golsVermelho, playerStats };
-    });
-  }, [filteredMatches]);
-
-  const [reportUrls, setReportUrls] = useState<Map<string, string>>(new Map());
-
-  useEffect(() => {
-    const withReports = filteredMatches.filter(m => m.reportFilePath);
-    if (withReports.length === 0) { setReportUrls(new Map()); return; }
-
-    supabase.storage
-      .from('match-reports')
-      .createSignedUrls(withReports.map(m => m.reportFilePath!), 3600)
-      .then(({ data }) => {
-        if (!data) return;
-        const map = new Map<string, string>();
-        withReports.forEach((m, i) => { if (data[i]?.signedUrl) map.set(m.id, data[i].signedUrl); });
-        setReportUrls(map);
-      });
-  }, [filteredMatches]);
-
   const StatCard = ({ title, data, icon: Icon, type }: { 
     title: string; 
     data: { id: string; nome: string; gols?: number; assistencias?: number; fieldGoals?: number; total?: number; media?: number; sofridos?: number }[]; 
@@ -852,90 +805,6 @@ export default function Reports({ matches, players, group }: ReportsProps) {
           </div>
         </section>
 
-        <section>
-          <div className="flex items-center gap-2 mb-4">
-            <FileText className="h-5 w-5 text-slate-500" />
-            <h2 className="text-lg font-bold">Partidas da Temporada</h2>
-          </div>
-          {matchLog.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma partida neste ano.</p>
-          ) : (
-            <div className="space-y-3">
-              {matchLog.map(({ match, golsAzul, golsVermelho, playerStats }) => {
-                const azulVenceu = golsAzul > golsVermelho;
-                const vermelhoVenceu = golsVermelho > golsAzul;
-                const empate = golsAzul === golsVermelho;
-
-                const renderPlayer = (t: typeof match.teams.azul[0]) => {
-                  const s = playerStats(t.playerId);
-                  const badges: string[] = [];
-                  if (s.gols > 0) badges.push(`${s.gols}G`);
-                  if (s.assists > 0) badges.push(`${s.assists}A`);
-                  if (s.ownGoals > 0) badges.push(`${s.ownGoals}GC`);
-                  if (s.fieldGoals > 0) badges.push(`${s.fieldGoals}FG`);
-                  return (
-                    <div key={t.playerId} className="flex items-center justify-between gap-2 py-0.5">
-                      <span className="text-sm truncate">
-                        {t.isGoalkeeper && <span className="mr-1 text-xs opacity-60">🧤</span>}
-                        {nameById(t.playerId)}
-                      </span>
-                      {badges.length > 0 && (
-                        <span className="text-xs text-muted-foreground whitespace-nowrap font-mono">{badges.join(' ')}</span>
-                      )}
-                    </div>
-                  );
-                };
-
-                const reportUrl = reportUrls.get(match.id);
-                return (
-                  <div key={match.id} className="flex gap-3 items-start">
-                  <Card className="overflow-hidden flex-1 min-w-0">
-                    <div
-                      className="flex items-center justify-between px-4 py-2 border-b"
-                      style={{ background: `linear-gradient(to right, ${homeConfig.color}15, transparent 40%, transparent 60%, ${awayConfig.color}15)` }}
-                    >
-                      <span className="text-xs text-muted-foreground font-medium">
-                        {format(new Date(match.date), 'dd/MM/yyyy')}
-                      </span>
-                      <div className="flex items-center gap-2 font-bold text-lg">
-                        <span style={{ color: azulVenceu ? homeConfig.color : undefined }}>{golsAzul}</span>
-                        <span className="text-muted-foreground text-sm">×</span>
-                        <span style={{ color: vermelhoVenceu ? awayConfig.color : undefined }}>{golsVermelho}</span>
-                      </div>
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${empate ? 'bg-yellow-100 text-yellow-800' : 'text-muted-foreground'}`}>
-                        {empate ? 'Empate' : azulVenceu ? homeConfig.name : awayConfig.name}
-                      </span>
-                    </div>
-                    <CardContent className="p-0">
-                      <div className="grid grid-cols-2 divide-x">
-                        <div className="p-3">
-                          <div className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: homeConfig.color }}>
-                            {homeConfig.name}
-                          </div>
-                          {match.teams.azul.map(renderPlayer)}
-                        </div>
-                        <div className="p-3">
-                          <div className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: awayConfig.color }}>
-                            {awayConfig.name}
-                          </div>
-                          {match.teams.vermelho.map(renderPlayer)}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  {reportUrl && (
-                    <img
-                      src={reportUrl}
-                      alt="Súmula"
-                      className="shrink-0 w-44 md:w-60 rounded-lg border border-slate-200 object-contain self-start"
-                    />
-                  )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
       </div>
     </div>
   );
