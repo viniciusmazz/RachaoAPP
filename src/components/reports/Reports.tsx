@@ -112,11 +112,11 @@ export default function Reports({ matches, players, group }: ReportsProps) {
       const hasEvents = match.events && match.events.length > 0;
       // Calculate score
       const golsAzul = hasEvents
-        ? match.events.filter(e => (e.team === 'azul' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'vermelho' && e.isOwnGoal)).length
+        ? match.events.filter(e => e.team === 'azul' && !e.isDummyGoal).length
         : (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) +
           (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
       const golsVermelho = hasEvents
-        ? match.events.filter(e => (e.team === 'vermelho' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'azul' && e.isOwnGoal)).length
+        ? match.events.filter(e => e.team === 'vermelho' && !e.isDummyGoal).length
         : (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) +
           (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
@@ -357,11 +357,11 @@ export default function Reports({ matches, players, group }: ReportsProps) {
     filteredMatches.forEach((m) => {
       const hasEvents = m.events && m.events.length > 0;
       const golsAzul = hasEvents
-        ? m.events.filter(e => (e.team === 'azul' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'vermelho' && e.isOwnGoal)).length
+        ? m.events.filter(e => e.team === 'azul' && !e.isDummyGoal).length
         : (m.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) +
           (m.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
       const golsVermelho = hasEvents
-        ? m.events.filter(e => (e.team === 'vermelho' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'azul' && e.isOwnGoal)).length
+        ? m.events.filter(e => e.team === 'vermelho' && !e.isDummyGoal).length
         : (m.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) +
           (m.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
@@ -492,10 +492,10 @@ export default function Reports({ matches, players, group }: ReportsProps) {
     return filteredMatches.map(match => {
       const hasEvents = match.events && match.events.length > 0;
       const golsAzul = hasEvents
-        ? match.events.filter(e => (e.team === 'azul' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'vermelho' && e.isOwnGoal)).length
+        ? match.events.filter(e => e.team === 'azul' && !e.isDummyGoal).length
         : (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) + (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
       const golsVermelho = hasEvents
-        ? match.events.filter(e => (e.team === 'vermelho' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'azul' && e.isOwnGoal)).length
+        ? match.events.filter(e => e.team === 'vermelho' && !e.isDummyGoal).length
         : (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) + (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
       const playerStats = (playerId: string) => {

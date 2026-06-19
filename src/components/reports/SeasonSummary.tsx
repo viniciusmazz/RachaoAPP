@@ -43,11 +43,11 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
       const hasEvents = match.events && match.events.length > 0;
       // Calculate score
       const golsAzul = hasEvents
-        ? match.events.filter(e => (e.team === 'azul' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'vermelho' && e.isOwnGoal)).length
+        ? match.events.filter(e => e.team === 'azul' && !e.isDummyGoal).length
         : (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) +
           (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
       const golsVermelho = hasEvents
-        ? match.events.filter(e => (e.team === 'vermelho' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'azul' && e.isOwnGoal)).length
+        ? match.events.filter(e => e.team === 'vermelho' && !e.isDummyGoal).length
         : (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) +
           (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
@@ -107,11 +107,11 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
       const hasEvents = match.events && match.events.length > 0;
       // Calculate score
       const golsAzul = hasEvents
-        ? match.events.filter(e => (e.team === 'azul' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'vermelho' && e.isOwnGoal)).length
+        ? match.events.filter(e => e.team === 'azul' && !e.isDummyGoal).length
         : (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) +
           (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
       const golsVermelho = hasEvents
-        ? match.events.filter(e => (e.team === 'vermelho' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'azul' && e.isOwnGoal)).length
+        ? match.events.filter(e => e.team === 'vermelho' && !e.isDummyGoal).length
         : (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) +
           (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
