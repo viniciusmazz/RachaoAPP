@@ -42,13 +42,13 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
     matches.forEach(match => {
       const hasEvents = match.events && match.events.length > 0;
       // Calculate score
-      const golsAzul = hasEvents 
-        ? match.events.filter(e => e.team === 'azul').length
-        : (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+      const golsAzul = hasEvents
+        ? match.events.filter(e => (e.team === 'azul' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'vermelho' && e.isOwnGoal)).length
+        : (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) +
           (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
       const golsVermelho = hasEvents
-        ? match.events.filter(e => e.team === 'vermelho').length
-        : (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+        ? match.events.filter(e => (e.team === 'vermelho' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'azul' && e.isOwnGoal)).length
+        : (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) +
           (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
       stats.azul.jogos++;
@@ -106,13 +106,13 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
     matches.forEach(match => {
       const hasEvents = match.events && match.events.length > 0;
       // Calculate score
-      const golsAzul = hasEvents 
-        ? match.events.filter(e => e.team === 'azul').length
-        : (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+      const golsAzul = hasEvents
+        ? match.events.filter(e => (e.team === 'azul' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'vermelho' && e.isOwnGoal)).length
+        : (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) +
           (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
       const golsVermelho = hasEvents
-        ? match.events.filter(e => e.team === 'vermelho').length
-        : (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+        ? match.events.filter(e => (e.team === 'vermelho' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'azul' && e.isOwnGoal)).length
+        : (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) +
           (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
       let azulResult: "v" | "e" | "d" = "e";
@@ -201,21 +201,24 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
     const maisDerrotas = entries.sort((a, b) => b[1].derrotas - a[1].derrotas)[0];
     items.push({ label: "Mais Derrotas", playerName: nameById(maisDerrotas[0]), value: `${maisDerrotas[1].derrotas}`, icon: ThumbsDown });
 
-    const melhorAprov = entries.sort((a, b) => {
-      const aAprov = a[1].pontos / (a[1].jogos * 3) * 100;
-      const bAprov = b[1].pontos / (b[1].jogos * 3) * 100;
-      return bAprov - aAprov;
-    })[0];
-    const melhorAprovVal = (melhorAprov[1].pontos / (melhorAprov[1].jogos * 3) * 100).toFixed(1);
-    items.push({ label: "Melhor Aproveitamento", playerName: nameById(melhorAprov[0]), value: `${melhorAprovVal}%`, icon: TrendingUp });
+    const aprovEntries = entries.filter(([, s]) => s.jogos >= 3);
+    if (aprovEntries.length > 0) {
+      const melhorAprov = [...aprovEntries].sort((a, b) => {
+        const aAprov = a[1].pontos / (a[1].jogos * 3) * 100;
+        const bAprov = b[1].pontos / (b[1].jogos * 3) * 100;
+        return bAprov - aAprov;
+      })[0];
+      const melhorAprovVal = (melhorAprov[1].pontos / (melhorAprov[1].jogos * 3) * 100).toFixed(1);
+      items.push({ label: "Melhor Aproveitamento", playerName: nameById(melhorAprov[0]), value: `${melhorAprovVal}%`, icon: TrendingUp });
 
-    const piorAprov = entries.sort((a, b) => {
-      const aAprov = a[1].pontos / (a[1].jogos * 3) * 100;
-      const bAprov = b[1].pontos / (b[1].jogos * 3) * 100;
-      return aAprov - bAprov;
-    })[0];
-    const piorAprovVal = (piorAprov[1].pontos / (piorAprov[1].jogos * 3) * 100).toFixed(1);
-    items.push({ label: "Pior Aproveitamento", playerName: nameById(piorAprov[0]), value: `${piorAprovVal}%`, icon: TrendingDown });
+      const piorAprov = [...aprovEntries].sort((a, b) => {
+        const aAprov = a[1].pontos / (a[1].jogos * 3) * 100;
+        const bAprov = b[1].pontos / (b[1].jogos * 3) * 100;
+        return aAprov - bAprov;
+      })[0];
+      const piorAprovVal = (piorAprov[1].pontos / (piorAprov[1].jogos * 3) * 100).toFixed(1);
+      items.push({ label: "Pior Aproveitamento", playerName: nameById(piorAprov[0]), value: `${piorAprovVal}%`, icon: TrendingDown });
+    }
 
     const liderPontos = entries.sort((a, b) => b[1].pontos - a[1].pontos)[0];
     items.push({ label: "Líder em Pontos", playerName: nameById(liderPontos[0]), value: `${liderPontos[1].pontos} pts`, icon: Star });
@@ -240,9 +243,9 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
       items.push({ label: "Mais Field Goals", playerName: nameById(liderFG[0]), value: `${liderFG[1].fieldGoals}`, icon: Crosshair });
     }
 
-    const gkEntries = Array.from(gkStats.entries());
+    const gkEntries = Array.from(gkStats.entries()).filter(([, s]) => s.jogos >= 3);
     if (gkEntries.length > 0) {
-      const melhorGK = gkEntries.sort((a, b) => {
+      const melhorGK = [...gkEntries].sort((a, b) => {
         const aMedia = a[1].sofridos / a[1].jogos;
         const bMedia = b[1].sofridos / b[1].jogos;
         return aMedia - bMedia;

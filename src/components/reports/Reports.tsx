@@ -109,13 +109,13 @@ export default function Reports({ matches, players, group }: ReportsProps) {
     filteredMatches.forEach(match => {
       const hasEvents = match.events && match.events.length > 0;
       // Calculate score
-      const golsAzul = hasEvents 
-        ? match.events.filter(e => e.team === 'azul').length
-        : (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+      const golsAzul = hasEvents
+        ? match.events.filter(e => (e.team === 'azul' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'vermelho' && e.isOwnGoal)).length
+        : (match.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) +
           (match.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
       const golsVermelho = hasEvents
-        ? match.events.filter(e => e.team === 'vermelho').length
-        : (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+        ? match.events.filter(e => (e.team === 'vermelho' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'azul' && e.isOwnGoal)).length
+        : (match.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) +
           (match.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
       // Determinar resultado
@@ -154,8 +154,9 @@ export default function Reports({ matches, players, group }: ReportsProps) {
             
             // Contar gols e assistências
             if (hasEvents) {
-              stats.gols += match.events.filter(e => e.scorerId === teamItem.playerId && !e.isOwnGoal).length;
-              stats.assistencias += match.events.filter(e => e.assistId === teamItem.playerId).length;
+              stats.gols += match.events.filter(e => e.scorerId === teamItem.playerId && !e.isOwnGoal && !e.isDummyGoal).length;
+              stats.assistencias += match.events.filter(e => e.assistId === teamItem.playerId).length
+                + match.events.reduce((sum, e) => sum + (e.extraAssistIds?.filter(id => id === teamItem.playerId).length ?? 0), 0);
             } else {
               stats.gols += teamItem.goals || 0;
               stats.assistencias += teamItem.assists || 0;
@@ -182,8 +183,9 @@ export default function Reports({ matches, players, group }: ReportsProps) {
 
             // Contar gols e assistências
             if (hasEvents) {
-              stats.gols += match.events.filter(e => e.scorerId === teamItem.playerId && !e.isOwnGoal).length;
-              stats.assistencias += match.events.filter(e => e.assistId === teamItem.playerId).length;
+              stats.gols += match.events.filter(e => e.scorerId === teamItem.playerId && !e.isOwnGoal && !e.isDummyGoal).length;
+              stats.assistencias += match.events.filter(e => e.assistId === teamItem.playerId).length
+                + match.events.reduce((sum, e) => sum + (e.extraAssistIds?.filter(id => id === teamItem.playerId).length ?? 0), 0);
             } else {
               stats.gols += teamItem.goals || 0;
               stats.assistencias += teamItem.assists || 0;
@@ -233,7 +235,7 @@ export default function Reports({ matches, players, group }: ReportsProps) {
       // Contar gols
       if (hasEvents) {
         m.events.forEach(e => {
-          if (!e.isOwnGoal && playerTypeById(e.scorerId) === playerType) {
+          if (!e.isOwnGoal && !e.isDummyGoal && playerTypeById(e.scorerId) === playerType) {
             goalsByPlayer.set(e.scorerId, (goalsByPlayer.get(e.scorerId) || 0) + 1);
           }
         });
@@ -285,6 +287,11 @@ export default function Reports({ matches, players, group }: ReportsProps) {
           if (e.assistId && playerTypeById(e.assistId) === playerType) {
             assistsByPlayer.set(e.assistId, (assistsByPlayer.get(e.assistId) || 0) + 1);
           }
+          e.extraAssistIds?.forEach(id => {
+            if (playerTypeById(id) === playerType) {
+              assistsByPlayer.set(id, (assistsByPlayer.get(id) || 0) + 1);
+            }
+          });
         });
       } else {
         m.teams.azul.forEach(p => {
@@ -346,13 +353,13 @@ export default function Reports({ matches, players, group }: ReportsProps) {
     
     filteredMatches.forEach((m) => {
       const hasEvents = m.events && m.events.length > 0;
-      const golsAzul = hasEvents 
-        ? m.events.filter((e) => e.team === "azul").length
-        : (m.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+      const golsAzul = hasEvents
+        ? m.events.filter(e => (e.team === 'azul' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'vermelho' && e.isOwnGoal)).length
+        : (m.teams.azul || []).reduce((sum, p) => sum + (p.goals || 0), 0) +
           (m.teams.vermelho || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
       const golsVermelho = hasEvents
-        ? m.events.filter((e) => e.team === "vermelho").length
-        : (m.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) + 
+        ? m.events.filter(e => (e.team === 'vermelho' && !e.isOwnGoal && !e.isDummyGoal) || (e.team === 'azul' && e.isOwnGoal)).length
+        : (m.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) +
           (m.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
       const gkAzul = m.teams.azul.find((t) => t.isGoalkeeper)?.playerId;
@@ -374,6 +381,7 @@ export default function Reports({ matches, players, group }: ReportsProps) {
         const media = jogos > 0 ? sofridos / jogos : 0;
         return { id, sofridos, jogos, media, nome: nameById(id) };
       })
+      .filter(gk => gk.jogos >= 3)
       .sort((a, b) => a.media - b.media);
   };
 
@@ -432,13 +440,18 @@ export default function Reports({ matches, players, group }: ReportsProps) {
       // Contar gols e assistências
       if (hasEvents) {
         m.events.forEach(e => {
+          if (!e.isOwnGoal && !e.isDummyGoal && playerTypeById(e.scorerId) === playerType) {
+            goalsByPlayer.set(e.scorerId, (goalsByPlayer.get(e.scorerId) || 0) + 1);
+          }
           if (!e.isOwnGoal) {
-            if (playerTypeById(e.scorerId) === playerType) {
-              goalsByPlayer.set(e.scorerId, (goalsByPlayer.get(e.scorerId) || 0) + 1);
-            }
             if (e.assistId && playerTypeById(e.assistId) === playerType) {
               assistsByPlayer.set(e.assistId, (assistsByPlayer.get(e.assistId) || 0) + 1);
             }
+            e.extraAssistIds?.forEach(id => {
+              if (playerTypeById(id) === playerType) {
+                assistsByPlayer.set(id, (assistsByPlayer.get(id) || 0) + 1);
+              }
+            });
           }
         });
       } else {
