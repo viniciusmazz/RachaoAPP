@@ -94,7 +94,7 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
       ownGoals: number; participacoes: number;
     }>();
 
-    const gkStats = new Map<string, { sofridos: number; jogos: number }>();
+    const gkStats = new Map<string, { sofridos: number; jogos: number; vitorias: number; empates: number; derrotas: number }>();
     const playerResultsSeq = new Map<string, ('v' | 'e' | 'd')[]>();
 
     const ensure = (id: string) => {
@@ -137,10 +137,13 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
           playerResultsSeq.set(t.playerId, resList);
 
           if (t.isGoalkeeper) {
-            if (!gkStats.has(t.playerId)) gkStats.set(t.playerId, { sofridos: 0, jogos: 0 });
+            if (!gkStats.has(t.playerId)) gkStats.set(t.playerId, { sofridos: 0, jogos: 0, vitorias: 0, empates: 0, derrotas: 0 });
             const gk = gkStats.get(t.playerId)!;
             gk.jogos++;
             gk.sofridos += goalsAgainst;
+            if (result === 'v') gk.vitorias++;
+            else if (result === 'e') gk.empates++;
+            else gk.derrotas++;
           }
         });
       };
@@ -251,13 +254,20 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
 
     const gkEntries = Array.from(gkStats.entries()).filter(([, s]) => s.jogos >= 3);
     if (gkEntries.length > 0) {
+      const totalGKSofridos = Array.from(gkStats.values()).reduce((a, b) => a + b.sofridos, 0);
+      const totalGKJogos = Array.from(gkStats.values()).reduce((a, b) => a + b.jogos, 0);
+      const leagueAvgGK = totalGKJogos > 0 ? totalGKSofridos / totalGKJogos : 0;
+      const k = 5;
       const melhorGK = [...gkEntries].sort((a, b) => {
-        const aMedia = a[1].sofridos / a[1].jogos;
-        const bMedia = b[1].sofridos / b[1].jogos;
-        return aMedia - bMedia;
+        const aAprov = ((a[1].vitorias * 3 + a[1].empates) / (a[1].jogos * 3)) * 100;
+        const bAprov = ((b[1].vitorias * 3 + b[1].empates) / (b[1].jogos * 3)) * 100;
+        const aAdj = (a[1].sofridos + k * leagueAvgGK) / (a[1].jogos + k);
+        const bAdj = (b[1].sofridos + k * leagueAvgGK) / (b[1].jogos + k);
+        return bAprov - aAprov || aAdj - bAdj;
       })[0];
-      const media = (melhorGK[1].sofridos / melhorGK[1].jogos).toFixed(2);
-      items.push({ label: "Goleiro Menos Vazado", playerName: nameById(melhorGK[0]), value: `${media}/jogo`, icon: Shield });
+      const aprov = Math.round(((melhorGK[1].vitorias * 3 + melhorGK[1].empates) / (melhorGK[1].jogos * 3)) * 100);
+      const mediaAdj = ((melhorGK[1].sofridos + k * leagueAvgGK) / (melhorGK[1].jogos + k)).toFixed(1);
+      items.push({ label: "Melhor Goleiro", playerName: nameById(melhorGK[0]), value: `${aprov}% / ${mediaAdj} gol/j`, icon: Shield });
     }
 
     const liderOG = entries.filter(([, s]) => s.ownGoals > 0).sort((a, b) => b[1].ownGoals - a[1].ownGoals)[0];

@@ -409,11 +409,14 @@ export default function Reports({ matches, players, group }: ReportsProps) {
       .sort((a, b) => b.gols - a.gols);
   };
 
-  // Goleiros menos vazados - separado por tipo
+  // Goleiros - separado por tipo
   const createGoalkeeperRanking = (playerType: "mensalista" | "convidado") => {
     const concededByGK = new Map<string, number>();
     const gamesByGK = new Map<string, number>();
-    
+    const winsByGK = new Map<string, number>();
+    const drawsByGK = new Map<string, number>();
+    const lossesByGK = new Map<string, number>();
+
     filteredMatches.forEach((m) => {
       const hasEvents = m.events && m.events.length > 0;
       const golsAzul = hasEvents
@@ -425,27 +428,43 @@ export default function Reports({ matches, players, group }: ReportsProps) {
         : (m.teams.vermelho || []).reduce((sum, p) => sum + (p.goals || 0), 0) +
           (m.teams.azul || []).reduce((sum, p) => sum + (p.ownGoals || 0), 0);
 
+      const azulRes: 'v' | 'e' | 'd' = golsAzul > golsVermelho ? 'v' : golsAzul < golsVermelho ? 'd' : 'e';
+      const vmRes: 'v' | 'e' | 'd' = golsVermelho > golsAzul ? 'v' : golsVermelho < golsAzul ? 'd' : 'e';
+
+      const trackGK = (gkId: string | undefined, conceded: number, res: 'v' | 'e' | 'd') => {
+        if (!gkId || playerTypeById(gkId) !== playerType) return;
+        concededByGK.set(gkId, (concededByGK.get(gkId) || 0) + conceded);
+        gamesByGK.set(gkId, (gamesByGK.get(gkId) || 0) + 1);
+        if (res === 'v') winsByGK.set(gkId, (winsByGK.get(gkId) || 0) + 1);
+        else if (res === 'e') drawsByGK.set(gkId, (drawsByGK.get(gkId) || 0) + 1);
+        else lossesByGK.set(gkId, (lossesByGK.get(gkId) || 0) + 1);
+      };
+
       const gkAzul = m.teams.azul.find((t) => t.isGoalkeeper)?.playerId;
       const gkVermelho = m.teams.vermelho.find((t) => t.isGoalkeeper)?.playerId;
-      
-      if (gkAzul && playerTypeById(gkAzul) === playerType) {
-        concededByGK.set(gkAzul, (concededByGK.get(gkAzul) || 0) + golsVermelho);
-        gamesByGK.set(gkAzul, (gamesByGK.get(gkAzul) || 0) + 1);
-      }
-      if (gkVermelho && playerTypeById(gkVermelho) === playerType) {
-        concededByGK.set(gkVermelho, (concededByGK.get(gkVermelho) || 0) + golsAzul);
-        gamesByGK.set(gkVermelho, (gamesByGK.get(gkVermelho) || 0) + 1);
-      }
+      trackGK(gkAzul, golsVermelho, azulRes);
+      trackGK(gkVermelho, golsAzul, vmRes);
     });
-    
+
+    // Média bayesiana: puxa amostras pequenas para a média geral
+    const totalSofridos = Array.from(concededByGK.values()).reduce((a, b) => a + b, 0);
+    const totalJogos = Array.from(gamesByGK.values()).reduce((a, b) => a + b, 0);
+    const leagueAvg = totalJogos > 0 ? totalSofridos / totalJogos : 0;
+    const k = 5;
+
     return Array.from(concededByGK.entries())
       .map(([id, sofridos]) => {
         const jogos = gamesByGK.get(id) || 0;
         const media = jogos > 0 ? sofridos / jogos : 0;
-        return { id, sofridos, jogos, media, nome: nameById(id) };
+        const mediaAjustada = (sofridos + k * leagueAvg) / (jogos + k);
+        const vitorias = winsByGK.get(id) || 0;
+        const empates = drawsByGK.get(id) || 0;
+        const derrotas = lossesByGK.get(id) || 0;
+        const aproveitamento = jogos > 0 ? ((vitorias * 3 + empates) / (jogos * 3)) * 100 : 0;
+        return { id, sofridos, jogos, media, mediaAjustada, vitorias, empates, derrotas, aproveitamento, nome: nameById(id) };
       })
       .filter(gk => gk.jogos >= 3)
-      .sort((a, b) => a.media - b.media);
+      .sort((a, b) => b.aproveitamento - a.aproveitamento || a.mediaAjustada - b.mediaAjustada);
   };
 
   // Field Goals por jogador - separado por tipo
@@ -548,18 +567,18 @@ export default function Reports({ matches, players, group }: ReportsProps) {
       .sort((a, b) => b.total - a.total);
   };
 
-  const StatCard = ({ title, data, icon: Icon, type }: { 
-    title: string; 
-    data: { id: string; nome: string; gols?: number; assistencias?: number; fieldGoals?: number; total?: number; media?: number; sofridos?: number }[]; 
-    icon: React.ElementType; 
+  const StatCard = ({ title, data, icon: Icon, type }: {
+    title: string;
+    data: { id: string; nome: string; gols?: number; assistencias?: number; fieldGoals?: number; total?: number; media?: number; sofridos?: number; jogos?: number; vitorias?: number; empates?: number; derrotas?: number; aproveitamento?: number; mediaAjustada?: number }[];
+    icon: React.ElementType;
     type: 'gols' | 'sofridos' | 'golscontra' | 'assistencias' | 'fieldgoals' | 'participacoes';
   }) => {
     const top3 = data.slice(0, 3);
     
     const isGoalkeeper = type === 'sofridos';
-    
-    const getDisplayValue = (item: { gols?: number; assistencias?: number; fieldGoals?: number; total?: number; media?: number; sofridos?: number }) => {
-      if (isGoalkeeper) return item.media?.toFixed(2);
+
+    const getDisplayValue = (item: { gols?: number; assistencias?: number; fieldGoals?: number; total?: number; media?: number; sofridos?: number; aproveitamento?: number }) => {
+      if (isGoalkeeper) return `${Math.round(item.aproveitamento ?? 0)}%`;
       if (type === 'gols') return item.gols;
       if (type === 'assistencias') return item.assistencias;
       if (type === 'fieldgoals') return item.fieldGoals;
@@ -588,7 +607,7 @@ export default function Reports({ matches, players, group }: ReportsProps) {
                   </div>
                   <span className="font-bold">
                     {getDisplayValue(item)}
-                    {isGoalkeeper && <span className="text-xs font-normal text-muted-foreground ml-1">média</span>}
+                    {isGoalkeeper && <span className="text-xs font-normal text-muted-foreground ml-1">aprov.</span>}
                   </span>
                 </div>
               ))}
@@ -614,8 +633,13 @@ export default function Reports({ matches, players, group }: ReportsProps) {
                             {isGoalkeeper ? (
                               <>
                                 <TableHead className="text-center">Jogos</TableHead>
-                                <TableHead className="text-center">Gols Sofridos</TableHead>
-                                <TableHead className="text-center">Média/Jogo</TableHead>
+                                <TableHead className="text-center">V</TableHead>
+                                <TableHead className="text-center">E</TableHead>
+                                <TableHead className="text-center">D</TableHead>
+                                <TableHead className="text-center">Aprov.%</TableHead>
+                                <TableHead className="text-center">GS</TableHead>
+                                <TableHead className="text-center">Méd. Real</TableHead>
+                                <TableHead className="text-center font-bold">Méd. Adj.</TableHead>
                               </>
                             ) : type === 'participacoes' ? (
                               <>
@@ -646,8 +670,13 @@ export default function Reports({ matches, players, group }: ReportsProps) {
                               {isGoalkeeper ? (
                                 <>
                                   <TableCell className="text-center">{item.jogos}</TableCell>
+                                  <TableCell className="text-center text-green-600">{item.vitorias}</TableCell>
+                                  <TableCell className="text-center text-yellow-600">{item.empates}</TableCell>
+                                  <TableCell className="text-center text-red-600">{item.derrotas}</TableCell>
+                                  <TableCell className="text-center font-bold">{Math.round(item.aproveitamento ?? 0)}%</TableCell>
                                   <TableCell className="text-center">{item.sofridos}</TableCell>
-                                  <TableCell className="text-center font-bold">{item.media?.toFixed(2)}</TableCell>
+                                  <TableCell className="text-center text-muted-foreground">{item.media?.toFixed(2)}</TableCell>
+                                  <TableCell className="text-center font-bold">{item.mediaAjustada?.toFixed(2)}</TableCell>
                                 </>
                               ) : type === 'participacoes' ? (
                                 <>
@@ -895,7 +924,7 @@ export default function Reports({ matches, players, group }: ReportsProps) {
               type="fieldgoals"
             />
             <StatCard
-              title="Goleiros (Média)"
+              title="Goleiros"
               data={createGoalkeeperRanking("mensalista")}
               icon={Shield}
               type="sofridos"
