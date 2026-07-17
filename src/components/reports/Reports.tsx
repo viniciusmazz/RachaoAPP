@@ -26,6 +26,11 @@ interface PlayerStats {
   jogosAzul: number;
   pontosVermelho: number;
   jogosVermelho: number;
+  sequenciaAtual: number;
+  maiorSequenciaVitorias: number;
+  maiorSequenciaDerrotas: number;
+  ultimosResultados: ('v' | 'e' | 'd')[];
+  evolucaoPontos: number[];
 }
 
 interface ReportsProps {
@@ -57,8 +62,11 @@ export default function Reports({ matches, players, group }: ReportsProps) {
     return matches.filter(m => new Date(m.date).getFullYear() === selectedYear);
   }, [matches, selectedYear]);
 
-  const nameById = (id: string) => players.find((p) => p.id === id)?.name ?? "";
-  const playerTypeById = (id: string) => players.find((p) => p.id === id)?.type ?? "mensalista";
+  const playerNameMap = useMemo(() => new Map(players.map(p => [p.id, p.name])), [players]);
+  const playerTypeMap = useMemo(() => new Map(players.map(p => [p.id, p.type])), [players]);
+
+  const nameById = (id: string) => playerNameMap.get(id) ?? "";
+  const playerTypeById = (id: string) => playerTypeMap.get(id) ?? "mensalista";
 
   // Filtrar jogadores por tipo
   const mensalistas = players.filter(p => p.type === "mensalista");
@@ -101,12 +109,22 @@ export default function Reports({ matches, players, group }: ReportsProps) {
         pontosAzul: 0,
         jogosAzul: 0,
         pontosVermelho: 0,
-        jogosVermelho: 0
+        jogosVermelho: 0,
+        sequenciaAtual: 0,
+        maiorSequenciaVitorias: 0,
+        maiorSequenciaDerrotas: 0,
+        ultimosResultados: [],
+        evolucaoPontos: [],
       });
     });
 
+    // Ordenar partidas cronologicamente para cálculo de sequências
+    const sortedMatches = [...filteredMatches].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const playerResults = new Map<string, ('v' | 'e' | 'd')[]>();
+    const playerCumulativePoints = new Map<string, number[]>();
+
     // Processar cada partida
-    filteredMatches.forEach(match => {
+    sortedMatches.forEach(match => {
       const hasEvents = match.events && match.events.length > 0;
       // Calculate score
       const golsAzul = hasEvents
@@ -151,7 +169,15 @@ export default function Reports({ matches, players, group }: ReportsProps) {
             if (azulResult === 'vitoria') stats.vitorias++;
             else if (azulResult === 'derrota') stats.derrotas++;
             else stats.empates++;
-            
+
+            const azRes: 'v' | 'e' | 'd' = azulResult === 'vitoria' ? 'v' : azulResult === 'derrota' ? 'd' : 'e';
+            const azResList = playerResults.get(teamItem.playerId) || [];
+            azResList.push(azRes);
+            playerResults.set(teamItem.playerId, azResList);
+            const azPtHist = playerCumulativePoints.get(teamItem.playerId) || [];
+            azPtHist.push((azPtHist.length > 0 ? azPtHist[azPtHist.length - 1] : 0) + azulPts);
+            playerCumulativePoints.set(teamItem.playerId, azPtHist);
+
             // Contar gols e assistências
             if (hasEvents) {
               stats.gols += match.events.filter(e => e.scorerId === teamItem.playerId && !e.isOwnGoal && !e.isDummyGoal).length;
@@ -181,6 +207,14 @@ export default function Reports({ matches, players, group }: ReportsProps) {
             else if (vermelhoResult === 'derrota') stats.derrotas++;
             else stats.empates++;
 
+            const vmRes: 'v' | 'e' | 'd' = vermelhoResult === 'vitoria' ? 'v' : vermelhoResult === 'derrota' ? 'd' : 'e';
+            const vmResList = playerResults.get(teamItem.playerId) || [];
+            vmResList.push(vmRes);
+            playerResults.set(teamItem.playerId, vmResList);
+            const vmPtHist = playerCumulativePoints.get(teamItem.playerId) || [];
+            vmPtHist.push((vmPtHist.length > 0 ? vmPtHist[vmPtHist.length - 1] : 0) + vermelhoPts);
+            playerCumulativePoints.set(teamItem.playerId, vmPtHist);
+
             // Contar gols e assistências
             if (hasEvents) {
               stats.gols += match.events.filter(e => e.scorerId === teamItem.playerId && !e.isOwnGoal && !e.isDummyGoal).length;
@@ -195,10 +229,38 @@ export default function Reports({ matches, players, group }: ReportsProps) {
       });
     });
 
-    // Calcular aproveitamento
-    playerStatsMap.forEach(stats => {
+    // Calcular aproveitamento e sequências
+    playerStatsMap.forEach((stats, id) => {
       if (stats.jogos > 0) {
         stats.aproveitamento = (stats.pontos / (stats.jogos * 3)) * 100;
+      }
+
+      const results = playerResults.get(id) || [];
+      stats.evolucaoPontos = playerCumulativePoints.get(id) || [];
+      stats.ultimosResultados = results.slice(-5);
+
+      if (results.length > 0) {
+        const lastResult = results[results.length - 1];
+        let currentStreak = 0;
+        for (let i = results.length - 1; i >= 0; i--) {
+          if (results[i] === lastResult) currentStreak++;
+          else break;
+        }
+        stats.sequenciaAtual = lastResult === 'v' ? currentStreak : lastResult === 'd' ? -currentStreak : 0;
+
+        let maxWin = 0, curWin = 0;
+        for (const r of results) {
+          if (r === 'v') { curWin++; if (curWin > maxWin) maxWin = curWin; }
+          else curWin = 0;
+        }
+        stats.maiorSequenciaVitorias = maxWin;
+
+        let maxLoss = 0, curLoss = 0;
+        for (const r of results) {
+          if (r === 'd') { curLoss++; if (curLoss > maxLoss) maxLoss = curLoss; }
+          else curLoss = 0;
+        }
+        stats.maiorSequenciaDerrotas = maxLoss;
       }
     });
 
@@ -212,7 +274,7 @@ export default function Reports({ matches, players, group }: ReportsProps) {
     );
   };
 
-  const playerStatsMensalistas = calculatePlayerStats("mensalista");
+  const playerStatsMensalistas = useMemo(() => calculatePlayerStats("mensalista"), [filteredMatches, playerNameMap, playerTypeMap]);
 
   // Artilharia (apenas gols normais, excluindo gols contra) - separado por tipo
   const createGoalsRanking = (playerType: "mensalista" | "convidado") => {
@@ -621,6 +683,32 @@ export default function Reports({ matches, players, group }: ReportsProps) {
     );
   };
 
+  const FormBadges = ({ results }: { results: ('v' | 'e' | 'd')[] }) => (
+    <div className="flex gap-0.5 justify-center">
+      {results.map((r, i) => (
+        <span key={i} className={`w-4 h-4 rounded-sm text-[8px] font-black flex items-center justify-center text-white ${
+          r === 'v' ? 'bg-green-500' : r === 'd' ? 'bg-red-500' : 'bg-yellow-500'
+        }`}>
+          {r === 'v' ? 'V' : r === 'd' ? 'D' : 'E'}
+        </span>
+      ))}
+    </div>
+  );
+
+  const Sparkline = ({ points }: { points: number[] }) => {
+    if (points.length < 2) return null;
+    const max = Math.max(...points);
+    if (max === 0) return null;
+    const w = 50, h = 18;
+    const xStep = w / (points.length - 1);
+    const pts = points.map((p, i) => `${(i * xStep).toFixed(1)},${(h - (p / max) * h).toFixed(1)}`).join(' ');
+    return (
+      <svg width={w} height={h} className="text-primary overflow-visible">
+        <polyline points={pts} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      </svg>
+    );
+  };
+
   const RankingCard = ({ playerStats, title }: { playerStats: PlayerStats[], title: string }) => {
     const top3 = playerStats.slice(0, 3);
     
@@ -668,7 +756,9 @@ export default function Reports({ matches, players, group }: ReportsProps) {
                              <TableHead className="text-center w-12">V</TableHead>
                              <TableHead className="text-center w-12">E</TableHead>
                              <TableHead className="text-center w-12">D</TableHead>
+                             <TableHead className="text-center w-14">Seq.</TableHead>
                              <TableHead className="text-center w-20">Aprov.%</TableHead>
+                             <TableHead className="text-center w-28">Forma</TableHead>
                              <TableHead className="text-center w-16" style={{ color: homeConfig.color }}>{homeConfig.name.substring(0, 2)}%</TableHead>
                              <TableHead className="text-center w-16" style={{ color: awayConfig.color }}>{awayConfig.name.substring(0, 2)}%</TableHead>
                              <TableHead className="text-center w-12">GP</TableHead>
@@ -676,6 +766,7 @@ export default function Reports({ matches, players, group }: ReportsProps) {
                              <TableHead className="text-center w-12">Gols</TableHead>
                              <TableHead className="text-center w-12">Ass</TableHead>
                              <TableHead className="text-center w-12">FG</TableHead>
+                             <TableHead className="text-center w-16">Evolução</TableHead>
                            </TableRow>
                          </TableHeader>
                          <TableBody>
@@ -691,7 +782,17 @@ export default function Reports({ matches, players, group }: ReportsProps) {
                                <TableCell className="text-center text-green-600">{player.vitorias}</TableCell>
                                <TableCell className="text-center text-yellow-600">{player.empates}</TableCell>
                                <TableCell className="text-center text-red-600">{player.derrotas}</TableCell>
+                               <TableCell className="text-center">
+                                 {player.sequenciaAtual !== 0 ? (
+                                   <span className={`text-xs font-bold ${player.sequenciaAtual > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                     {Math.abs(player.sequenciaAtual)}{player.sequenciaAtual > 0 ? 'V' : 'D'}
+                                   </span>
+                                 ) : <span className="text-muted-foreground text-xs">—</span>}
+                               </TableCell>
                                <TableCell className="text-center">{Math.round(player.aproveitamento)}%</TableCell>
+                               <TableCell className="text-center">
+                                 <FormBadges results={player.ultimosResultados} />
+                               </TableCell>
                                <TableCell className="text-center" style={{ color: homeConfig.color }}>{azAprov !== null ? `${azAprov}%` : '—'}</TableCell>
                                <TableCell className="text-center" style={{ color: awayConfig.color }}>{vmAprov !== null ? `${vmAprov}%` : '—'}</TableCell>
                                <TableCell className="text-center">{player.golsPro}</TableCell>
@@ -699,6 +800,9 @@ export default function Reports({ matches, players, group }: ReportsProps) {
                                <TableCell className="text-center font-medium">{player.gols}</TableCell>
                                <TableCell className="text-center">{player.assistencias}</TableCell>
                                <TableCell className="text-center">{player.fieldGoals}</TableCell>
+                               <TableCell className="text-center">
+                                 <Sparkline points={player.evolucaoPontos} />
+                               </TableCell>
                              </TableRow>
                              );
                            })}

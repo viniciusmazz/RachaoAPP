@@ -6,6 +6,7 @@ import { toast } from "@/hooks/use-toast";
 import TeamAssignment from "./TeamAssignment";
 import FileUpload from "./FileUpload";
 import type { Match, Player, Teams, Group } from "@/types/football";
+import { createTeamEvents } from "@/lib/matchEvents";
 
 interface EditMatchDialogProps {
   match: Match;
@@ -25,98 +26,6 @@ export default function EditMatchDialog({ match, players, onMatchUpdate, group }
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Converte os dados para o formato legado de events para manter compatibilidade
-      // IMPORTANTE: Cria cópias profundas para não mutar o estado original
-      const createTeamEvents = (teamPlayers: typeof teams.azul, teamColor: "azul" | "vermelho") => {
-        const goals = [];
-        // Cria cópias dos dados de assistência para não mutar o original
-        const assistTracker = teamPlayers
-          .filter(p => (p.assists || 0) > 0)
-          .map(p => ({ playerId: p.playerId, remaining: p.assists || 0 }));
-        let assistIndex = 0;
-        
-        for (const player of teamPlayers) {
-          // Adicionar gols normais
-          for (let i = 0; i < (player.goals || 0); i++) {
-            const event: MatchEvent = {
-              id: `${player.playerId}-goal-${i}`,
-              team: teamColor,
-              scorerId: player.playerId,
-            };
-            
-            // Distribuir assistências entre os gols (usando cópia)
-            if (assistTracker.length > 0) {
-              const tracker = assistTracker[assistIndex % assistTracker.length];
-              if (tracker.remaining > 0) {
-                if (!event.assistId) {
-                  event.assistId = tracker.playerId;
-                } else {
-                  if (!event.extraAssistIds) event.extraAssistIds = [];
-                  event.extraAssistIds.push(tracker.playerId);
-                }
-                tracker.remaining -= 1;
-                if (tracker.remaining === 0) {
-                  assistTracker.splice(assistIndex % assistTracker.length, 1);
-                } else {
-                  assistIndex++;
-                }
-              }
-            }
-            
-            // If this is the last goal, add all remaining assists!
-            if (i === (player.goals || 0) - 1 && teamPlayers.indexOf(player) === teamPlayers.length - 1) {
-              while (assistTracker.length > 0) {
-                const tracker = assistTracker[assistIndex % assistTracker.length];
-                if (tracker.remaining > 0) {
-                  if (!event.assistId) {
-                    event.assistId = tracker.playerId;
-                  } else {
-                    if (!event.extraAssistIds) event.extraAssistIds = [];
-                    event.extraAssistIds.push(tracker.playerId);
-                  }
-                  tracker.remaining -= 1;
-                  if (tracker.remaining === 0) {
-                    assistTracker.splice(assistIndex % assistTracker.length, 1);
-                  } else {
-                    assistIndex++;
-                  }
-                } else {
-                  assistTracker.splice(assistIndex % assistTracker.length, 1);
-                }
-              }
-            }
-            
-            goals.push(event);
-          }
-          
-        // Adicionar gols contra
-        for (let i = 0; i < (player.ownGoals || 0); i++) {
-          goals.push({
-            id: `${player.playerId}-owngoal-${i}`,
-            team: teamColor === "azul" ? "vermelho" : "azul",
-            scorerId: player.playerId,
-            isOwnGoal: true,
-          });
-        }
-      }
-      
-      // Adicionar assistências restantes como eventos dummy
-      for (const tracker of assistTracker) {
-        while (tracker.remaining > 0) {
-          goals.push({
-            id: `${tracker.playerId}-dummy-${Date.now()}-${Math.random()}`,
-            team: teamColor,
-            scorerId: tracker.playerId,
-            assistId: tracker.playerId,
-            isDummyGoal: true,
-          });
-          tracker.remaining -= 1;
-        }
-      }
-      
-      return goals;
-    };
-      
       const events = [
         ...createTeamEvents(teams.azul, "azul"),
         ...createTeamEvents(teams.vermelho, "vermelho"),

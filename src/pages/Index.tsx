@@ -23,7 +23,8 @@ import GroupMembers from "@/components/group/GroupMembers";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import JoinGroupDialog from "@/components/group/JoinGroupDialog";
 import { useUserGroups } from "@/hooks/useGroup";
-import type { Teams, Group, MatchEvent } from "@/types/football";
+import type { Teams, Group } from "@/types/football";
+import { createTeamEvents } from "@/lib/matchEvents";
 
 interface IndexProps {
   group: Group;
@@ -134,57 +135,6 @@ const Index = ({ group, refreshGroup }: IndexProps) => {
   const handleSaveMatch = async () => {
     if (!canSave) return;
     try {
-      // Converte os dados para o formato legado de events para manter compatibilidade
-      const createTeamEvents = (teamPlayers: typeof teams.azul, teamColor: "azul" | "vermelho") => {
-        const goalEvents: MatchEvent[] = [];
-        const otherEvents: MatchEvent[] = [];
-        
-        // Build flat queue of assists to distribute
-        const assistQueue: string[] = [];
-        for (const player of teamPlayers) {
-          for (let i = 0; i < (player.assists || 0); i++) {
-            assistQueue.push(player.playerId);
-          }
-        }
-        
-        // Create goal events
-        for (const player of teamPlayers) {
-          for (let i = 0; i < (player.goals || 0); i++) {
-            goalEvents.push({
-              id: `${player.playerId}-goal-${i}`,
-              team: teamColor,
-              scorerId: player.playerId,
-            });
-          }
-          
-          // Own goals
-          for (let i = 0; i < (player.ownGoals || 0); i++) {
-            otherEvents.push({
-              id: `${player.playerId}-owngoal-${i}`,
-              team: teamColor === "azul" ? "vermelho" : "azul",
-              scorerId: player.playerId,
-              isOwnGoal: true,
-            });
-          }
-        }
-        
-        // Distribute assists to goals, preferring non-self-assists
-        for (const goal of goalEvents) {
-          if (assistQueue.length === 0) break;
-          
-          const nonSelfIdx = assistQueue.findIndex(id => id !== goal.scorerId);
-          if (nonSelfIdx !== -1) {
-            goal.assistId = assistQueue[nonSelfIdx];
-            assistQueue.splice(nonSelfIdx, 1);
-          } else {
-            // Only self-assists remain, assign anyway
-            goal.assistId = assistQueue.shift();
-          }
-        }
-        
-        return [...goalEvents, ...otherEvents];
-      };
-      
       const events = [
         ...createTeamEvents(teams.azul, "azul"),
         ...createTeamEvents(teams.vermelho, "vermelho"),

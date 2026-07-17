@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Trophy, TrendingUp, TrendingDown, Target, Shield, AlertTriangle, Crosshair, Award, ThumbsDown, Star, Users } from "lucide-react";
+import { Trophy, TrendingUp, TrendingDown, Target, Shield, AlertTriangle, Crosshair, Award, ThumbsDown, Star, Users, Flame, Skull } from "lucide-react";
 import type { Match, Player, TeamSide, Group } from "@/types/football";
 
 interface SeasonSummaryProps {
@@ -95,6 +95,7 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
     }>();
 
     const gkStats = new Map<string, { sofridos: number; jogos: number }>();
+    const playerResultsSeq = new Map<string, ('v' | 'e' | 'd')[]>();
 
     const ensure = (id: string) => {
       if (!stats.has(id)) {
@@ -103,7 +104,8 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
       return stats.get(id)!;
     };
 
-    matches.forEach(match => {
+    const sortedMatches = [...matches].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    sortedMatches.forEach(match => {
       const hasEvents = match.events && match.events.length > 0;
       // Calculate score
       const golsAzul = hasEvents
@@ -129,6 +131,10 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
           if (result === "v") { s.vitorias++; s.pontos += 3; }
           else if (result === "e") { s.empates++; s.pontos += 1; }
           else { s.derrotas++; }
+
+          const resList = playerResultsSeq.get(t.playerId) || [];
+          resList.push(result);
+          playerResultsSeq.set(t.playerId, resList);
 
           if (t.isGoalkeeper) {
             if (!gkStats.has(t.playerId)) gkStats.set(t.playerId, { sofridos: 0, jogos: 0 });
@@ -257,6 +263,31 @@ export default function SeasonSummary({ matches, players, selectedYear, group }:
     const liderOG = entries.filter(([, s]) => s.ownGoals > 0).sort((a, b) => b[1].ownGoals - a[1].ownGoals)[0];
     if (liderOG) {
       items.push({ label: "Líder em Gols Contra", playerName: nameById(liderOG[0]), value: `${liderOG[1].ownGoals}`, icon: AlertTriangle });
+    }
+
+    const streakData = entries.map(([id]) => {
+      const results = playerResultsSeq.get(id) || [];
+      let maxWin = 0, curWin = 0;
+      for (const r of results) {
+        if (r === 'v') { curWin++; if (curWin > maxWin) maxWin = curWin; }
+        else curWin = 0;
+      }
+      let maxLoss = 0, curLoss = 0;
+      for (const r of results) {
+        if (r === 'd') { curLoss++; if (curLoss > maxLoss) maxLoss = curLoss; }
+        else curLoss = 0;
+      }
+      return { id, maxWin, maxLoss };
+    });
+
+    const topWinStreak = [...streakData].filter(e => e.maxWin > 1).sort((a, b) => b.maxWin - a.maxWin)[0];
+    if (topWinStreak) {
+      items.push({ label: "Maior Seq. de Vitórias", playerName: nameById(topWinStreak.id), value: `${topWinStreak.maxWin}V`, icon: Flame });
+    }
+
+    const topLossStreak = [...streakData].filter(e => e.maxLoss > 1).sort((a, b) => b.maxLoss - a.maxLoss)[0];
+    if (topLossStreak) {
+      items.push({ label: "Maior Seq. de Derrotas", playerName: nameById(topLossStreak.id), value: `${topLossStreak.maxLoss}D`, icon: Skull });
     }
 
     return items;

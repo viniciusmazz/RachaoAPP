@@ -163,7 +163,6 @@ export const useMatches = (groupId?: string) => {
           observations: updatedMatch.observations || null,
         })
         .eq('id', matchId)
-        .eq('user_id', user.id)
 
       if (error) throw error
 
