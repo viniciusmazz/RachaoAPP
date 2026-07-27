@@ -117,12 +117,11 @@ export const usePlayers = (groupId?: string) => {
         title: "Sucesso",
         description: "Jogador adicionado com sucesso"
       })
-    } catch (error: unknown) {
+    } catch (error) {
       console.error('Erro ao adicionar jogador:', error)
-      const msg = (error as { message?: string })?.message || JSON.stringify(error)
       toast({
-        title: "Erro ao adicionar jogador",
-        description: msg,
+        title: "Erro",
+        description: "Não foi possível adicionar o jogador",
         variant: "destructive"
       })
     }
